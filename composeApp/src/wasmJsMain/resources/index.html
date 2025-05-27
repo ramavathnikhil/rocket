@@ -4,6 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>Rapido Rocket</title>
+    <!-- Update CSP headers to allow multiple CDNs -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self' https://*.firebaseio.com https://*.firebase.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.firebaseio.com https://*.firebase.com https://*.gstatic.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net;
+        style-src 'self' 'unsafe-inline';
+        connect-src 'self' https://*.firebaseio.com https://*.firebase.com wss://*.firebaseio.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net;
+        img-src 'self' data: https:;
+        font-src 'self' data: https:;
+    ">
     <style>
         html, body {
             height: 100vh;
@@ -23,6 +32,41 @@
         * {
             pointer-events: auto !important;
         }
+        .ad-blocker-notice {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 9999;
+            max-width: 400px;
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .ad-blocker-notice h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .ad-blocker-notice p {
+            color: #666;
+            line-height: 1.5;
+        }
+        .ad-blocker-notice button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .ad-blocker-notice button:hover {
+            background: #3367d6;
+        }
     </style>
     <!-- Enable DevTools -->
     <script>
@@ -31,34 +75,106 @@
             window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { isDisabled: true };
         }
     </script>
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script>
-        // Initialize Firebase
-        const firebaseConfig = {
-            apiKey: "AIzaSyBp2Xzont2ixx7hmYcJ1L0_BJQ8bjAUtQc",
-            authDomain: "rideon-edd12.firebaseapp.com",
-            databaseURL: "https://rideon-edd12.firebaseio.com",
-            projectId: "rideon-edd12",
-            storageBucket: "rideon-edd12.firebasestorage.app",
-            messagingSenderId: "301187883692",
-            appId: "1:301187883692:web:dc6fa5c806c9e4e821f509"
-        };
-        
-        window.addEventListener('load', function() {
-            // Initialize Firebase
-            window.firebase.initializeApp(firebaseConfig);
-            // Signal that Firebase is ready
-            window.firebaseInitialized = true;
-            // Make config available to Kotlin
-            window.firebaseConfig = firebaseConfig;
-        });
-    </script>
 </head>
 <body>
     <div id="root"></div>
+    <!-- Ad Blocker Notice -->
+    <div id="adBlockerNotice" class="ad-blocker-notice">
+        <h2>Ad Blocker Detected</h2>
+        <p>We noticed that you're using an ad blocker. Our app requires access to Firebase services to function properly.</p>
+        <p>Please either:</p>
+        <p>1. Disable your ad blocker for this site<br>
+           2. Try using incognito/private browsing mode<br>
+           3. Whitelist *.firebaseio.com, *.googleapis.com</p>
+        <button onclick="location.reload()">Reload Page</button>
+    </div>
     <script src="composeApp.js"></script>
+    <script>
+        // Define multiple CDN sources for each Firebase package
+        const cdnSources = {
+            app: [
+                'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
+                'https://unpkg.com/firebase@10.8.0/firebase-app-compat.js',
+                'https://cdn.jsdelivr.net/npm/firebase@10.8.0/firebase-app-compat.js'
+            ],
+            auth: [
+                'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js',
+                'https://unpkg.com/firebase@10.8.0/firebase-auth-compat.js',
+                'https://cdn.jsdelivr.net/npm/firebase@10.8.0/firebase-auth-compat.js'
+            ],
+            firestore: [
+                'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
+                'https://unpkg.com/firebase@10.8.0/firebase-firestore-compat.js',
+                'https://cdn.jsdelivr.net/npm/firebase@10.8.0/firebase-firestore-compat.js'
+            ]
+        };
+
+        let loadAttempts = 0;
+        const MAX_ATTEMPTS = 2;
+
+        async function loadScriptWithFallback(sources) {
+            for (const src of sources) {
+                try {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = src;
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.body.appendChild(script);
+                    });
+                    console.log(`Successfully loaded: ${src}`);
+                    return true;
+                } catch (error) {
+                    console.warn(`Failed to load ${src}, trying next source...`);
+                }
+            }
+            throw new Error(`Failed to load script from all sources`);
+        }
+
+        async function initializeFirebase() {
+            try {
+                loadAttempts++;
+                // Load Firebase scripts with fallbacks
+                await loadScriptWithFallback(cdnSources.app);
+                await loadScriptWithFallback(cdnSources.auth);
+                await loadScriptWithFallback(cdnSources.firestore);
+
+                const firebaseConfig = {
+                    apiKey: "AIzaSyBp2Xzont2ixx7hmYcJ1L0_BJQ8bjAUtQc",
+                    authDomain: "rideon-edd12.firebaseapp.com",
+                    databaseURL: "https://rideon-edd12.firebaseio.com",
+                    projectId: "rideon-edd12",
+                    storageBucket: "rideon-edd12.firebasestorage.app",
+                    messagingSenderId: "301187883692",
+                    appId: "1:301187883692:web:dc6fa5c806c9e4e821f509"
+                };
+
+                // Initialize Firebase
+                window.firebase.initializeApp(firebaseConfig);
+                window.firebaseConfig = firebaseConfig;
+                window.firebaseInitialized = true;
+                console.log('Firebase initialized successfully');
+                
+                // Hide ad blocker notice if it was shown
+                document.getElementById('adBlockerNotice').style.display = 'none';
+            } catch (error) {
+                console.error('Failed to initialize Firebase:', error);
+                
+                if (loadAttempts >= MAX_ATTEMPTS) {
+                    // Show the ad blocker notice
+                    document.getElementById('adBlockerNotice').style.display = 'block';
+                } else {
+                    // Try again after a short delay
+                    setTimeout(() => initializeFirebase(), 1000);
+                }
+                window.firebaseInitializationError = error;
+            }
+        }
+
+        // Initialize everything when the page loads
+        window.addEventListener('load', function() {
+            initializeFirebase().catch(console.error);
+        });
+    </script>
 </body>
 </html>

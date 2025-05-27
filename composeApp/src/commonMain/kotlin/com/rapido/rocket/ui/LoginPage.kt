@@ -22,6 +22,21 @@ fun LoginPage(
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
+    // Check if Firebase is initialized
+    LaunchedEffect(Unit) {
+        // Firebase initialization is handled by platform-specific code
+        isLoading = false
+    }
+
+    // Check auth state
+    LaunchedEffect(Unit) {
+        authRepository.observeAuthState().collect { user ->
+            if (user != null) {
+                onLoginSuccess()
+            }
+        }
+    }
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -77,17 +92,29 @@ fun LoginPage(
                     
                     error = null
                     isLoading = true
+                    println("Starting login process for email: $email")
                     scope.launch {
                         try {
+                            println("Calling authRepository.signIn...")
                             val result = authRepository.signIn(email, password)
-                            result.onSuccess {
+                            println("SignIn result received: $result")
+                            result.onSuccess { user ->
+                                println("Login successful, user: $user")
+                                if (user != null) {
+                                    println("User is not null, calling onLoginSuccess")
+                                    onLoginSuccess()
+                                } else {
+                                    println("User is null after successful login")
+                                    error = "Login failed: User is null"
+                                }
                                 isLoading = false
-                                onLoginSuccess()
-                            }.onFailure {
-                                error = it.message ?: "Login failed"
+                            }.onFailure { exception ->
+                                println("Login failed with exception: $exception")
+                                error = exception.message ?: "Login failed"
                                 isLoading = false
                             }
                         } catch (e: Exception) {
+                            println("Login error caught: $e")
                             error = e.message ?: "Login failed"
                             isLoading = false
                         }
@@ -110,10 +137,13 @@ fun LoginPage(
 
             TextButton(
                 onClick = onNavigateToRegister,
+                enabled = !isLoading,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Don't have an account? Sign up")
             }
         }
+
+        // Firebase initialization is handled by the main App composable
     }
 } 

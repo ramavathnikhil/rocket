@@ -12,7 +12,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlin.js.Promise
 import kotlin.js.JsAny
+import kotlin.js.JsBoolean
 import kotlinx.browser.localStorage
+import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 external interface FirebaseAuthResult : JsAny {
     val user: FirebaseUser
@@ -172,20 +176,26 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
     }
 
     override suspend fun signIn(email: String, password: String): Result<User> = try {
+        println("WasmFirebaseAuthRepository: Starting signIn for $email")
         val authResult = auth.signInWithEmailAndPassword(email, password).await()
+        println("WasmFirebaseAuthRepository: Auth successful, uid: ${authResult.user.uid}")
         val doc = usersCollection.doc(authResult.user.uid).get().await()
+        println("WasmFirebaseAuthRepository: Document retrieved, exists: ${doc.exists}")
         val data = doc.data()?.let { jsToMap(it) } ?: emptyMap()
+        println("WasmFirebaseAuthRepository: Document data: $data")
         val user = User(
-            id = data["id"] as? String ?: "",
-            email = data["email"] as? String ?: "",
+            id = data["id"] as? String ?: authResult.user.uid,
+            email = data["email"] as? String ?: email,
             username = data["username"] as? String ?: "",
             role = UserRole.valueOf(data["role"] as? String ?: UserRole.USER.name),
             status = UserStatus.valueOf(data["status"] as? String ?: UserStatus.PENDING_APPROVAL.name),
             createdAt = (data["createdAt"] as? Number)?.toLong() ?: currentTimeMillis(),
             updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: currentTimeMillis()
         )
+        println("WasmFirebaseAuthRepository: User created: $user")
         Result.success(user)
     } catch (e: Throwable) {
+        println("WasmFirebaseAuthRepository: SignIn failed with error: $e")
         Result.failure(e)
     }
 
@@ -315,4 +325,12 @@ private fun Map<String, Any>.toJsObject(): JsAny {
     return plainObj
 }
 
-private suspend fun <T : JsAny?> Promise<T>.await(): T = kotlinx.coroutines.awaitCancellation()
+private suspend fun <T : JsAny?> Promise<T>.await(): T = kotlin.coroutines.suspendCoroutine { continuation ->
+    this.then { result ->
+        continuation.resume(result)
+        null
+    }.catch { error: JsAny ->
+        continuation.resumeWithException(Exception(error.toString()))
+        null as JsAny?
+    }
+}
