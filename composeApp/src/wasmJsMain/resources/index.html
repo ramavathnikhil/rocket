@@ -21,6 +21,47 @@
             width: 100%;
             overflow: auto;
         }
+        
+        /* Production loading screen styles */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        #loading-content {
+            text-align: center;
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         #root {
             height: 100vh;
             width: 100%;
@@ -28,9 +69,19 @@
             flex-direction: column;
             position: relative;
         }
+        
         /* Enable pointer events for inspection */
         * {
             pointer-events: auto !important;
+        }
+        
+        .error {
+            background: #ff4444;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px;
+            font-family: Arial, sans-serif;
         }
         .ad-blocker-notice {
             display: none;
@@ -77,7 +128,17 @@
     </script>
 </head>
 <body>
+    <!-- Loading screen for production builds -->
+    <div id="loading" style="display: none;">
+        <div id="loading-content">
+            <div class="spinner"></div>
+            <h2>Rapido Rocket</h2>
+            <p>Initializing...</p>
+        </div>
+    </div>
+    
     <div id="root"></div>
+    
     <!-- Ad Blocker Notice -->
     <div id="adBlockerNotice" class="ad-blocker-notice">
         <h2>Ad Blocker Detected</h2>
@@ -88,7 +149,41 @@
            3. Whitelist *.firebaseio.com, *.googleapis.com</p>
         <button onclick="location.reload()">Reload Page</button>
     </div>
-    <script src="composeApp.js"></script>
+    
+    <!-- Detect environment and load appropriate bundle -->
+    <script>
+        // Detect if this is a production build by checking for specific files
+        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        
+        if (isProduction) {
+            // Show loading screen for production
+            document.getElementById('loading').style.display = 'flex';
+            console.log('Production mode detected');
+        } else {
+            console.log('Development mode detected');
+        }
+        
+        // Load the appropriate bundle
+        if (isProduction) {
+            // Production: Load UMD bundle
+            const script = document.createElement('script');
+            script.src = 'composeApp.js';
+            script.onload = function() {
+                console.log('WASM bundle loaded successfully');
+            };
+            script.onerror = function() {
+                console.error('Failed to load WASM bundle');
+                document.getElementById('loading-content').innerHTML = 
+                    '<div class="error">Failed to load application. Please refresh the page.</div>';
+            };
+            document.body.appendChild(script);
+        } else {
+            // Development: Load ES module
+            const script = document.createElement('script');
+            script.src = 'composeApp.js';
+            document.body.appendChild(script);
+        }
+    </script>
     <script>
         // Define multiple CDN sources for each Firebase package
         const cdnSources = {
@@ -170,6 +265,24 @@
                 window.firebaseInitializationError = error;
             }
         }
+
+        // Function called by Kotlin when app is ready
+        window.showApp = function() {
+            console.log('App ready, hiding loading screen...');
+            const loadingElement = document.getElementById('loading');
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const rootElement = document.getElementById('root');
+            if (rootElement) {
+                rootElement.style.display = 'block';
+            }
+        };
+
+        // Function to check if Firebase is already initialized
+        window.isFirebaseInitialized = function() {
+            return typeof window.firebase !== 'undefined' && window.firebase !== null && window.firebaseInitialized === true;
+        };
 
         // Initialize everything when the page loads
         window.addEventListener('load', function() {

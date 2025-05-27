@@ -122,3 +122,14 @@ dependencies {
     debugImplementation(compose.uiTooling)
 }
 
+// Task to copy unified index.html to production build directory
+tasks.register<Copy>("copyIndexHtml") {
+    from("src/wasmJsMain/resources/index.html")
+    into("build/kotlin-webpack/wasmJs/productionExecutable")
+}
+
+// Make the copy task run after production webpack
+tasks.named("wasmJsBrowserProductionWebpack") {
+    finalizedBy("copyIndexHtml")
+}
+

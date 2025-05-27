@@ -27,15 +27,11 @@ private external interface Window {
 private external val window: Window
 
 private external fun checkFirebaseInitialized(): Boolean = definedExternally
-private external fun scheduleRetry(): Unit = definedExternally
+private external fun showApp(): Unit = definedExternally
 
 // Implementation of external functions
 private fun checkFirebaseInitializedImpl(): Boolean =
     js("typeof window.firebaseInitialized !== 'undefined' && window.firebaseInitialized === true")
-
-private fun scheduleRetryImpl() {
-    js("setTimeout(function() { main(); }, 100)")
-}
 
 // Enable inspection
 private fun enableInspection() {
@@ -58,6 +54,8 @@ fun main() {
     try {
         Console.log("Setting up window load handler...")
         enableInspection()
+        
+
 
         // Check if document is already loaded
         if (document.readyState == DocumentReadyState.COMPLETE) {
@@ -85,7 +83,11 @@ private fun initializeApp() {
         
         if (!firebaseInitialized) {
             Console.log("Firebase not initialized yet, retrying...")
-            scheduleRetryImpl()
+            // Use a simple timeout to retry
+            kotlinx.browser.window.setTimeout({
+                initializeApp()
+                null // Return null to satisfy JsAny? requirement
+            }, 100)
             return
         }
 
@@ -104,6 +106,9 @@ private fun initializeApp() {
             App()
         }
         Console.log("ComposeViewport setup complete")
+        
+        // Call the JavaScript function to show the app
+        showApp()
     } catch (e: Throwable) {
         Console.error("Failed to initialize app: ${e.message}")
         Console.error("Error details: ${e.stackTraceToString()}")
@@ -120,4 +125,4 @@ private fun initializeApp() {
             </div>
         """.trimIndent()
     }
-}
+} 

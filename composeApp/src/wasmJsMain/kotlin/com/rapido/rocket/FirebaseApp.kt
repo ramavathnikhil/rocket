@@ -20,8 +20,31 @@ external object Firebase {
 @JsName("firebaseConfig")
 private external val firebaseConfig: FirebaseConfig
 
+// External function to check if Firebase is already initialized
+private external fun isFirebaseInitialized(): Boolean = definedExternally
+
 actual object FirebaseApp {
     actual fun initialize() {
-        Firebase.initializeApp(firebaseConfig)
+        // Check if Firebase is already initialized (by the HTML JavaScript)
+        val isAlreadyInitialized = try {
+            isFirebaseInitialized()
+        } catch (e: Exception) {
+            false
+        }
+        
+        if (isAlreadyInitialized) {
+            println("Firebase already initialized by HTML, skipping Kotlin initialization")
+            return
+        }
+        
+        // Only initialize if not already done
+        try {
+            Firebase.initializeApp(firebaseConfig)
+            println("Firebase initialized by Kotlin")
+        } catch (e: Exception) {
+            println("Firebase initialization failed: $e")
+            // If initialization fails, it might already be initialized
+            // This is acceptable for WASM where HTML handles initialization
+        }
     }
 } 
