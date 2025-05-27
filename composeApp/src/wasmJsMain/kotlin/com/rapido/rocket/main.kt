@@ -79,18 +79,24 @@ private fun initializeApp() {
     Console.log("Initializing app...")
     
     try {
-        if (!checkFirebaseInitializedImpl()) {
+        Console.log("Checking Firebase initialization status...")
+        val firebaseInitialized = checkFirebaseInitializedImpl()
+        Console.log("Firebase initialized: $firebaseInitialized")
+        
+        if (!firebaseInitialized) {
             Console.log("Firebase not initialized yet, retrying...")
             scheduleRetryImpl()
             return
         }
 
+        Console.log("Looking for root element...")
         val rootElement = document.getElementById("root")
         if (rootElement == null) {
             Console.error("Root element not found!")
             document.body?.innerHTML = "Failed to initialize app: Root element not found"
             return
         }
+        Console.log("Root element found: $rootElement")
 
         Console.log("Setting up ComposeViewport...")
         ComposeViewport(rootElement) {
@@ -99,7 +105,19 @@ private fun initializeApp() {
         }
         Console.log("ComposeViewport setup complete")
     } catch (e: Throwable) {
-        Console.error("Failed to initialize app", e as JsAny)
-        document.body?.innerHTML = "Failed to initialize app. Please check console for details."
+        Console.error("Failed to initialize app: ${e.message}")
+        Console.error("Error details: ${e.stackTraceToString()}")
+        Console.error("Full error object", e as JsAny)
+        document.body?.innerHTML = """
+            <div style="padding: 20px; background: #ff4444; color: white; font-family: Arial;">
+                <h3>Failed to initialize app</h3>
+                <p>Error: ${e.message ?: "Unknown error"}</p>
+                <p>Please check console for details.</p>
+                <details>
+                    <summary>Stack trace</summary>
+                    <pre style="background: #333; padding: 10px; overflow: auto;">${e.stackTraceToString()}</pre>
+                </details>
+            </div>
+        """.trimIndent()
     }
 }

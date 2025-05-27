@@ -32,6 +32,22 @@ data class User(
         "updatedAt" to updatedAt
     )
 
+    // Utility functions for role and status checking
+    fun isAdmin(): Boolean = role == UserRole.ADMIN
+    fun isUser(): Boolean = role == UserRole.USER
+    fun isApproved(): Boolean = status == UserStatus.APPROVED
+    fun isPending(): Boolean = status == UserStatus.PENDING_APPROVAL
+    fun isRejected(): Boolean = status == UserStatus.REJECTED
+    
+    // Check if user can perform admin actions
+    fun canManageUsers(): Boolean = isAdmin() && isApproved()
+    
+    // Check if user can access the app
+    fun canAccessApp(): Boolean = isApproved()
+    
+    // Get display name
+    fun getDisplayName(): String = username.ifEmpty { email.substringBefore("@") }
+
     companion object {
         fun fromMap(map: Map<String, Any>): User = User(
             id = map["id"] as? String ?: "",

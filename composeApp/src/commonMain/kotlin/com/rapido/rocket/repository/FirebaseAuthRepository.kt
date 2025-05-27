@@ -10,7 +10,11 @@ interface FirebaseAuthRepository {
     suspend fun getCurrentUser(): User?
     fun observeAuthState(): Flow<User?>
     suspend fun updateUserStatus(userId: String, status: String): Result<Unit>
+    suspend fun updateUserRole(userId: String, role: String): Result<Unit>
+    suspend fun updateUserProfile(userId: String, username: String, email: String): Result<Unit>
     suspend fun deleteUser(userId: String): Result<Unit>
+    suspend fun getAllUsers(): Result<List<User>>
+    suspend fun getUserById(userId: String): Result<User?>
     fun isUserLoggedIn(): Boolean
     fun getAuthToken(): String?
     

@@ -13,9 +13,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import com.rapido.rocket.FirebaseApp
+import com.rapido.rocket.repository.FirebaseAuthRepository
 import com.rapido.rocket.repository.FirebaseAuthRepositoryFactory
 import com.rapido.rocket.ui.HomePage
 import com.rapido.rocket.ui.LoginPage
@@ -24,9 +26,82 @@ import com.rapido.rocket.viewmodel.AuthViewModel
 
 @Composable
 fun App() {
-    FirebaseApp.initialize()
+    var initializationError by remember { mutableStateOf<String?>(null) }
+    var authRepository by remember { mutableStateOf<FirebaseAuthRepository?>(null) }
     
-    val authRepository = remember { FirebaseAuthRepositoryFactory.create() }
+    // Initialize Firebase and auth repository
+    LaunchedEffect(Unit) {
+        try {
+            println("App: Initializing Firebase...")
+            FirebaseApp.initialize()
+            println("App: Firebase initialized successfully")
+            
+            println("App: Creating auth repository...")
+            authRepository = FirebaseAuthRepositoryFactory.create()
+            println("App: Auth repository created successfully")
+        } catch (e: Exception) {
+            println("App: Error during initialization: $e")
+            initializationError = "Failed to initialize: ${e.message}"
+        }
+    }
+    
+    MaterialTheme {
+        Surface(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            when {
+                initializationError != null -> {
+                    // Show error UI
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "Initialization Error",
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = initializationError!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+                authRepository == null -> {
+                    // Show loading
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Initializing app...")
+                        }
+                    }
+                }
+                else -> {
+                    // Show main app
+                    MainAppContent(authRepository!!)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainAppContent(authRepository: FirebaseAuthRepository) {
     val authViewModel = remember { AuthViewModel(authRepository) }
     var isLoggedIn by remember { mutableStateOf<Boolean?>(null) } // null = unknown, true = logged in, false = not logged in
     var showRegister by remember { mutableStateOf(false) }
@@ -97,11 +172,7 @@ fun App() {
         println("Current login state: $isLoggedIn")
     }
 
-    MaterialTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
                 when {
                     !isInitialized || isLoggedIn == null -> {
                         // Show loading while Firebase initializes or checking auth state
@@ -116,7 +187,7 @@ fun App() {
                                 CircularProgressIndicator()
                                 Spacer(modifier = Modifier.height(16.dp))
                                 Text(
-                                    if (!isInitialized) "Initializing Firebase..." 
+                                    if (!isInitialized) "Initializing Rocket..."
                                     else "Checking authentication..."
                                 )
                             }
@@ -155,6 +226,4 @@ fun App() {
                     }
                 }
             }
-        }
-    }
 }

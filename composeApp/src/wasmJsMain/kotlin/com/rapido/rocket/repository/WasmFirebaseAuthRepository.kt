@@ -75,12 +75,6 @@ external object console {
     fun error(message: String, error: JsAny)
 }
 
-@JsName("Promise")
-private external class JsPromise<T : JsAny> {
-    fun <R : JsAny> then(onFulfilled: (T) -> R?): JsPromise<R>
-    fun catch(onRejected: (JsAny) -> Unit): JsPromise<T>
-}
-
 @JsName("Array")
 private external object JsArray {
     fun from(value: JsAny): JsAny
@@ -95,6 +89,11 @@ private external class JsArrayImpl : JsAny {
 @JsName("typeof")
 private external fun getJsType(value: JsAny): String
 
+@JsName("Object")
+private external object JsObjectOps {
+    fun set(obj: JsAny, key: String, value: JsAny): Unit
+}
+
 class WasmFirebaseAuthRepository : FirebaseAuthRepository {
     private val auth: FirebaseAuth = Firebase.auth()
     private val firestore: FirebaseFirestore = Firebase.firestore()
@@ -105,6 +104,18 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
 
     init {
         println("WasmFirebaseAuthRepository: Initializing auth state listener")
+        
+        // Test Firestore connection
+        try {
+            println("WasmFirebaseAuthRepository: Testing Firestore connection...")
+            println("WasmFirebaseAuthRepository: Firestore instance: $firestore")
+            println("WasmFirebaseAuthRepository: Users collection: $usersCollection")
+            
+            // Skip Firestore test for now to avoid blocking initialization
+            println("WasmFirebaseAuthRepository: Skipping Firestore test to avoid blocking initialization")
+        } catch (e: Exception) {
+            println("WasmFirebaseAuthRepository: Error testing Firestore connection: $e")
+        }
         
         // Check if there's already a current user (for page refresh scenarios)
         val currentUser = auth.currentUser
@@ -117,7 +128,14 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
                     try {
                         val doc = usersCollection.doc(user.uid).get().await()
                         if (doc.exists) {
-                            val data = doc.data()?.let { jsToMap(it) } ?: emptyMap()
+                            println("WasmFirebaseAuthRepository: Document exists, parsing data...")
+                            val data = try {
+                                doc.data()?.let { jsToMap(it) } ?: emptyMap()
+                            } catch (parseError: Exception) {
+                                println("WasmFirebaseAuthRepository: Error parsing document data: $parseError")
+                                emptyMap()
+                            }
+                            
                             val userData = User(
                                 id = data["id"] as? String ?: user.uid,
                                 email = data["email"] as? String ?: user.email ?: "",
@@ -147,6 +165,49 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
                                 createdAt = currentTimeMillis(),
                                 updatedAt = currentTimeMillis()
                             )
+                            
+                            // Try to create the user document in Firestore
+                            try {
+                                println("WasmFirebaseAuthRepository: Attempting to create user document for ${user.uid}")
+                                val userDataMap = mapOf(
+                                    "id" to userData.id,
+                                    "email" to userData.email,
+                                    "username" to userData.username,
+                                    "role" to userData.role.name,
+                                    "status" to userData.status.name,
+                                    "createdAt" to userData.createdAt,
+                                    "updatedAt" to userData.updatedAt
+                                )
+                                println("WasmFirebaseAuthRepository: User data map: $userDataMap")
+                                println("WasmFirebaseAuthRepository: Converting to JS object...")
+                                
+                                val jsUserData = try {
+                                    println("WasmFirebaseAuthRepository: Starting JS object conversion...")
+                                    val result = userDataMap.toJsObject()
+                                    println("WasmFirebaseAuthRepository: JS object conversion successful")
+                                    result
+                                } catch (conversionError: Exception) {
+                                    println("WasmFirebaseAuthRepository: Error converting user data to JS object: $conversionError")
+                                    println("WasmFirebaseAuthRepository: Conversion error details: ${conversionError.message}")
+                                    println("WasmFirebaseAuthRepository: Conversion error stack: ${conversionError.stackTraceToString()}")
+                                    return@launch
+                                }
+                                
+                                println("WasmFirebaseAuthRepository: JS object created, attempting Firestore write...")
+                                usersCollection.doc(user.uid).set(jsUserData).then { result ->
+                                    println("WasmFirebaseAuthRepository: User document created successfully in auth state listener!")
+                                    null
+                                }.catch { error ->
+                                    println("WasmFirebaseAuthRepository: Error creating user document in auth state listener: $error")
+                                    println("WasmFirebaseAuthRepository: Error type: ${error::class.simpleName}")
+                                    println("WasmFirebaseAuthRepository: Error message: ${error.toString()}")
+                                    console.error("User document creation error", error)
+                                    null as JsAny?
+                                }
+                            } catch (e: Exception) {
+                                println("WasmFirebaseAuthRepository: Exception creating user document in auth state listener: $e")
+                            }
+                            
                             _authStateFlow.update { userData }
                             // Store token anyway
                             user.getIdToken(true).then { token ->
@@ -170,7 +231,10 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
     }
 
     override suspend fun signUp(email: String, password: String, username: String): Result<User> = try {
+        println("WasmFirebaseAuthRepository: Starting signUp for $email")
         val authResult = auth.createUserWithEmailAndPassword(email, password).await()
+        println("WasmFirebaseAuthRepository: Auth user created successfully, uid: ${authResult.user.uid}")
+        
         val user = User(
             id = authResult.user.uid,
             email = email,
@@ -180,6 +244,8 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
             createdAt = currentTimeMillis(),
             updatedAt = currentTimeMillis()
         )
+        println("WasmFirebaseAuthRepository: User object created: $user")
+        
         val userData = mapOf(
             "id" to user.id,
             "email" to user.email,
@@ -189,18 +255,35 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
             "createdAt" to user.createdAt,
             "updatedAt" to user.updatedAt
         )
+        println("WasmFirebaseAuthRepository: User data map created: $userData")
         
         // Create user document with the same ID as auth UID
-        usersCollection.doc(user.id).set(userData.toJsObject()).await()
+        println("WasmFirebaseAuthRepository: Attempting to create Firestore document...")
+        try {
+            println("WasmFirebaseAuthRepository: Starting JS object conversion for signup...")
+            val jsUserData = userData.toJsObject()
+            println("WasmFirebaseAuthRepository: JS object conversion successful for signup")
+            println("WasmFirebaseAuthRepository: Attempting Firestore write...")
+            usersCollection.doc(user.id).set(jsUserData).await()
+            println("WasmFirebaseAuthRepository: Firestore document created successfully!")
+        } catch (firestoreError: Exception) {
+            println("WasmFirebaseAuthRepository: Error creating Firestore document: $firestoreError")
+            println("WasmFirebaseAuthRepository: Firestore error details: ${firestoreError.message}")
+            println("WasmFirebaseAuthRepository: Firestore error stack: ${firestoreError.stackTraceToString()}")
+            throw firestoreError
+        }
         
         // Get the token and store it
         authResult.user.getIdToken(true).then { token ->
             localStorage.setItem(TOKEN_KEY, token.toString())
+            println("WasmFirebaseAuthRepository: Token stored after signup")
             null
         }
         
+        println("WasmFirebaseAuthRepository: SignUp completed successfully")
         Result.success(user)
     } catch (e: Throwable) {
+        println("WasmFirebaseAuthRepository: SignUp failed with error: $e")
         Result.failure(e)
     }
 
@@ -210,7 +293,12 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
         println("WasmFirebaseAuthRepository: Auth successful, uid: ${authResult.user.uid}")
         val doc = usersCollection.doc(authResult.user.uid).get().await()
         println("WasmFirebaseAuthRepository: Document retrieved, exists: ${doc.exists}")
-        val data = doc.data()?.let { jsToMap(it) } ?: emptyMap()
+        val data = try {
+            doc.data()?.let { jsToMap(it) } ?: emptyMap()
+        } catch (parseError: Exception) {
+            println("WasmFirebaseAuthRepository: Error parsing document data in signIn: $parseError")
+            emptyMap()
+        }
         println("WasmFirebaseAuthRepository: Document data: $data")
         val user = User(
             id = data["id"] as? String ?: authResult.user.uid,
@@ -246,7 +334,12 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
         try {
             val doc = usersCollection.doc(firebaseUser.uid).get().await()
             println("WasmFirebaseAuthRepository: Document exists: ${doc.exists}")
-            val data = doc.data()?.let { jsToMap(it) } ?: emptyMap()
+            val data = try {
+                doc.data()?.let { jsToMap(it) } ?: emptyMap()
+            } catch (parseError: Exception) {
+                println("WasmFirebaseAuthRepository: Error parsing document data in getCurrentUser: $parseError")
+                emptyMap()
+            }
             println("WasmFirebaseAuthRepository: Document data: $data")
             
             val user = User(
@@ -269,20 +362,96 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
     override fun observeAuthState(): Flow<User?> = _authStateFlow
 
     override suspend fun updateUserStatus(userId: String, status: String): Result<Unit> = try {
+        println("WasmFirebaseAuthRepository: Updating user status for $userId to $status")
         val updateData = mapOf(
             "status" to status,
             "updatedAt" to currentTimeMillis()
         )
         usersCollection.doc(userId).update(updateData.toJsObject()).await()
+        println("WasmFirebaseAuthRepository: User status updated successfully")
         Result.success(Unit)
     } catch (e: Throwable) {
+        println("WasmFirebaseAuthRepository: Error updating user status: $e")
+        Result.failure(e)
+    }
+
+    override suspend fun updateUserRole(userId: String, role: String): Result<Unit> = try {
+        println("WasmFirebaseAuthRepository: Updating user role for $userId to $role")
+        val updateData = mapOf(
+            "role" to role,
+            "updatedAt" to currentTimeMillis()
+        )
+        usersCollection.doc(userId).update(updateData.toJsObject()).await()
+        println("WasmFirebaseAuthRepository: User role updated successfully")
+        Result.success(Unit)
+    } catch (e: Throwable) {
+        println("WasmFirebaseAuthRepository: Error updating user role: $e")
+        Result.failure(e)
+    }
+
+    override suspend fun updateUserProfile(userId: String, username: String, email: String): Result<Unit> = try {
+        println("WasmFirebaseAuthRepository: Updating user profile for $userId")
+        val updateData = mapOf(
+            "username" to username,
+            "email" to email,
+            "updatedAt" to currentTimeMillis()
+        )
+        usersCollection.doc(userId).update(updateData.toJsObject()).await()
+        println("WasmFirebaseAuthRepository: User profile updated successfully")
+        Result.success(Unit)
+    } catch (e: Throwable) {
+        println("WasmFirebaseAuthRepository: Error updating user profile: $e")
+        Result.failure(e)
+    }
+
+    override suspend fun getAllUsers(): Result<List<User>> = try {
+        println("WasmFirebaseAuthRepository: Getting all users")
+        // Note: This would require a different approach in WASM as we can't directly query collections
+        // For now, we'll return an empty list and log that this feature needs admin implementation
+        println("WasmFirebaseAuthRepository: getAllUsers not fully implemented in WASM - requires admin panel")
+        Result.success(emptyList())
+    } catch (e: Throwable) {
+        println("WasmFirebaseAuthRepository: Error getting all users: $e")
+        Result.failure(e)
+    }
+
+    override suspend fun getUserById(userId: String): Result<User?> = try {
+        println("WasmFirebaseAuthRepository: Getting user by ID: $userId")
+        val doc = usersCollection.doc(userId).get().await()
+        if (doc.exists) {
+            val data = try {
+                doc.data()?.let { jsToMap(it) } ?: emptyMap()
+            } catch (parseError: Exception) {
+                println("WasmFirebaseAuthRepository: Error parsing document data in getUserById: $parseError")
+                emptyMap()
+            }
+            val user = User(
+                id = data["id"] as? String ?: userId,
+                email = data["email"] as? String ?: "",
+                username = data["username"] as? String ?: "",
+                role = UserRole.valueOf(data["role"] as? String ?: UserRole.USER.name),
+                status = UserStatus.valueOf(data["status"] as? String ?: UserStatus.PENDING_APPROVAL.name),
+                createdAt = (data["createdAt"] as? Number)?.toLong() ?: currentTimeMillis(),
+                updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: currentTimeMillis()
+            )
+            println("WasmFirebaseAuthRepository: User found: $user")
+            Result.success(user)
+        } else {
+            println("WasmFirebaseAuthRepository: User not found")
+            Result.success(null)
+        }
+    } catch (e: Throwable) {
+        println("WasmFirebaseAuthRepository: Error getting user by ID: $e")
         Result.failure(e)
     }
 
     override suspend fun deleteUser(userId: String): Result<Unit> = try {
+        println("WasmFirebaseAuthRepository: Deleting user: $userId")
         usersCollection.doc(userId).delete().await()
+        println("WasmFirebaseAuthRepository: User deleted successfully")
         Result.success(Unit)
     } catch (e: Throwable) {
+        println("WasmFirebaseAuthRepository: Error deleting user: $e")
         Result.failure(e)
     }
 
@@ -354,45 +523,76 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
 
 private fun JsAny.asJsArray(): JsArrayImpl = this.unsafeCast<JsArrayImpl>()
 
+@JsName("JSON")
+private external object JSON {
+    fun stringify(obj: JsAny): String
+}
+
 private fun jsToMap(jsObject: JsAny): Map<String, Any> {
-    val map = mutableMapOf<String, Any>()
-    val entries = JsObject.entries(jsObject)
-    val entriesArray = JsArray.from(entries).asJsArray()
-    
-    for (i in 0 until entriesArray.length) {
-        val entry = entriesArray.item(i)?.unsafeCast<JsArrayImpl>() ?: continue
-        val key = entry.item(0)?.toString() ?: continue
-        val value = entry.item(1) ?: continue
+    return try {
+        val jsonString = JSON.stringify(jsObject)
+        println("WasmFirebaseAuthRepository: Firestore data JSON: $jsonString")
         
-        map[key] = when (getJsType(value)) {
-            "string" -> value.toString()
-            "number" -> (value as Number).toDouble()
-            "boolean" -> value as Boolean
-            else -> value.toString()
+        // Parse the JSON string manually to create a Kotlin map
+        val map = mutableMapOf<String, Any>()
+        
+        // Simple JSON parsing for our known structure
+        if (jsonString.startsWith("{") && jsonString.endsWith("}")) {
+            val content = jsonString.substring(1, jsonString.length - 1)
+            val pairs = content.split(",")
+            
+            for (pair in pairs) {
+                val keyValue = pair.split(":")
+                if (keyValue.size == 2) {
+                    val key = keyValue[0].trim().removeSurrounding("\"")
+                    val valueStr = keyValue[1].trim()
+                    
+                    val value: Any = when {
+                        valueStr == "true" -> true
+                        valueStr == "false" -> false
+                        valueStr.startsWith("\"") && valueStr.endsWith("\"") -> valueStr.removeSurrounding("\"")
+                        valueStr.contains(".") -> valueStr.toDoubleOrNull() ?: valueStr
+                        else -> valueStr.toLongOrNull() ?: valueStr
+                    }
+                    map[key] = value
+                }
+            }
         }
+        
+        println("WasmFirebaseAuthRepository: Parsed map: $map")
+        map
+    } catch (e: Exception) {
+        println("WasmFirebaseAuthRepository: Error parsing JS object: $e")
+        emptyMap()
     }
-    
-    return map
 }
 
-@JsName("Object")
-private external object JsObjectOps {
-    fun set(obj: JsAny, key: String, value: JsAny): Unit
-}
-
-private fun setJsField(obj: JsAny, key: String, value: JsAny) {
-    JsObjectOps.set(obj, key, value)
-}
+// Use a much simpler approach with external JS function
+@JsName("eval")
+private external fun jsEval(code: String): JsAny
 
 private fun Map<String, Any>.toJsObject(): JsAny {
-    val plainObj = JsObject.create()
-    forEach { (key, value) ->
-        setJsField(plainObj, key, value as JsAny)
+    // Create a simple JS object using JSON
+    val jsonString = buildString {
+        append("{")
+        val entries = this@toJsObject.entries.toList()
+        entries.forEachIndexed { index, (key, value) ->
+            append("\"$key\":")
+            when (value) {
+                is String -> append("\"${value.replace("\"", "\\\"")}\"")
+                is Number -> append(value.toString())
+                is Boolean -> append(value.toString())
+                else -> append("\"${value.toString().replace("\"", "\\\"")}\"")
+            }
+            if (index < entries.size - 1) append(",")
+        }
+        append("}")
     }
-    return plainObj
+    println("WasmFirebaseAuthRepository: JSON string: $jsonString")
+    return jsEval("($jsonString)")
 }
 
-private suspend fun <T : JsAny?> Promise<T>.await(): T = kotlin.coroutines.suspendCoroutine { continuation ->
+private suspend fun <T : JsAny?> Promise<T>.await(): T = suspendCoroutine { continuation ->
     this.then { result ->
         continuation.resume(result)
         null
