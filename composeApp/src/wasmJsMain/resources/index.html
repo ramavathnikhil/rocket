@@ -38,14 +38,13 @@
     <script>
         // Initialize Firebase
         const firebaseConfig = {
-            apiKey: "AIzaSyCSjWuJ5iHWfmyQKgHRDuVhg1-VZ05qcIg",
-            authDomain: "rapido-captain-test.firebaseapp.com",
-            databaseURL: "https://rapido-captain-test.firebaseio.com",
-            projectId: "rapido-captain-test",
-            storageBucket: "rapido-captain-test.firebasestorage.app",
-            messagingSenderId: "468013252606",
-            appId: "1:468013252606:web:47e9fd55e214c0e4888aaf",
-            measurementId: "G-0TZYPDMV79"
+            apiKey: "AIzaSyBp2Xzont2ixx7hmYcJ1L0_BJQ8bjAUtQc",
+            authDomain: "rideon-edd12.firebaseapp.com",
+            databaseURL: "https://rideon-edd12.firebaseio.com",
+            projectId: "rideon-edd12",
+            storageBucket: "rideon-edd12.firebasestorage.app",
+            messagingSenderId: "301187883692",
+            appId: "1:301187883692:web:dc6fa5c806c9e4e821f509"
         };
         
         window.addEventListener('load', function() {
@@ -53,6 +52,8 @@
             window.firebase.initializeApp(firebaseConfig);
             // Signal that Firebase is ready
             window.firebaseInitialized = true;
+            // Make config available to Kotlin
+            window.firebaseConfig = firebaseConfig;
         });
     </script>
 </head>

@@ -1,20 +1,27 @@
 package com.rapido.rocket
 
 import kotlin.js.JsAny
-import kotlin.js.JsName
+
+external interface FirebaseConfig : JsAny {
+    var apiKey: String
+    var authDomain: String
+    var databaseURL: String
+    var projectId: String
+    var storageBucket: String
+    var messagingSenderId: String
+    var appId: String
+}
 
 @JsName("firebase")
-private external object FirebaseJs {
-    fun app(): JsAny
+external object Firebase {
+    fun initializeApp(config: FirebaseConfig)
 }
+
+@JsName("firebaseConfig")
+private external val firebaseConfig: FirebaseConfig
 
 actual object FirebaseApp {
     actual fun initialize() {
-        try {
-            // Check if Firebase is initialized
-            FirebaseJs.app()
-        } catch (e: Throwable) {
-            // Handle initialization error silently
-        }
+        Firebase.initializeApp(firebaseConfig)
     }
 } 
