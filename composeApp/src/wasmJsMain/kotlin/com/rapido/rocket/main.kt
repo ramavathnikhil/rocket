@@ -1,0 +1,105 @@
+package com.rapido.rocket
+
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.window.ComposeViewport
+import kotlinx.browser.document
+import kotlinx.browser.window
+import org.w3c.dom.COMPLETE
+import org.w3c.dom.DocumentReadyState
+import org.w3c.dom.HTMLStyleElement
+import org.w3c.dom.events.Event
+import org.w3c.dom.events.EventListener
+
+@JsName("console")
+private external object Console {
+    fun log(message: String)
+    fun error(message: String)
+    fun error(message: String, error: JsAny = definedExternally)
+}
+
+// External declarations for window functions
+private external interface Event : JsAny
+private external interface Window {
+    fun addEventListener(type: String, listener: (Event) -> Unit)
+}
+
+@JsName("window")
+private external val window: Window
+
+private external fun checkFirebaseInitialized(): Boolean = definedExternally
+private external fun scheduleRetry(): Unit = definedExternally
+
+// Implementation of external functions
+private fun checkFirebaseInitializedImpl(): Boolean =
+    js("typeof window.firebaseInitialized !== 'undefined' && window.firebaseInitialized === true")
+
+private fun scheduleRetryImpl() {
+    js("setTimeout(function() { main(); }, 100)")
+}
+
+// Enable inspection
+private fun enableInspection() {
+    js("""
+        if (typeof window.__COMPOSE_INSPECTOR_GLOBAL_HOOK__ === 'undefined') {
+            window.__COMPOSE_INSPECTOR_GLOBAL_HOOK__ = {
+                isDisabled: false,
+                componentsById: new Map(),
+                components: [],
+                fiber: null
+            };
+        }
+    """)
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+fun main() {
+    Console.log("Starting app initialization...")
+    
+    try {
+        Console.log("Setting up window load handler...")
+        enableInspection()
+
+        // Check if document is already loaded
+        if (document.readyState == DocumentReadyState.COMPLETE) {
+            Console.log("Document already loaded, initializing immediately...")
+            initializeApp()
+        } else {
+            Console.log("Document not ready, setting up load listener...")
+            window.addEventListener("DOMContentLoaded", { initializeApp() })
+            window.addEventListener("load", { initializeApp() })
+        }
+    } catch (e: Throwable) {
+        Console.error("Failed in main initialization", e as JsAny)
+        document.body?.innerHTML = "Failed in main initialization. Please check console for details."
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+private fun initializeApp() {
+    Console.log("Initializing app...")
+    
+    try {
+        if (!checkFirebaseInitializedImpl()) {
+            Console.log("Firebase not initialized yet, retrying...")
+            scheduleRetryImpl()
+            return
+        }
+
+        val rootElement = document.getElementById("root")
+        if (rootElement == null) {
+            Console.error("Root element not found!")
+            document.body?.innerHTML = "Failed to initialize app: Root element not found"
+            return
+        }
+
+        Console.log("Setting up ComposeViewport...")
+        ComposeViewport(rootElement) {
+            Console.log("Rendering App composable...")
+            App()
+        }
+        Console.log("ComposeViewport setup complete")
+    } catch (e: Throwable) {
+        Console.error("Failed to initialize app", e as JsAny)
+        document.body?.innerHTML = "Failed to initialize app. Please check console for details."
+    }
+}

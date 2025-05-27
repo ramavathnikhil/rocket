@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Rapido Rocket</title>
+    <style>
+        html, body {
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            overflow: auto;
+        }
+        #root {
+            height: 100vh;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        /* Enable pointer events for inspection */
+        * {
+            pointer-events: auto !important;
+        }
+    </style>
+    <!-- Enable DevTools -->
+    <script>
+        // Enable DevTools
+        if (typeof window.__REACT_DEVTOOLS_GLOBAL_HOOK__ === 'undefined') {
+            window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { isDisabled: true };
+        }
+    </script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCSjWuJ5iHWfmyQKgHRDuVhg1-VZ05qcIg",
+            authDomain: "rapido-captain-test.firebaseapp.com",
+            databaseURL: "https://rapido-captain-test.firebaseio.com",
+            projectId: "rapido-captain-test",
+            storageBucket: "rapido-captain-test.firebasestorage.app",
+            messagingSenderId: "468013252606",
+            appId: "1:468013252606:web:47e9fd55e214c0e4888aaf",
+            measurementId: "G-0TZYPDMV79"
+        };
+        
+        window.addEventListener('load', function() {
+            // Initialize Firebase
+            window.firebase.initializeApp(firebaseConfig);
+            // Signal that Firebase is ready
+            window.firebaseInitialized = true;
+        });
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+    <script src="composeApp.js"></script>
+</body>
+</html>
