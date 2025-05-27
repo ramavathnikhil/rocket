@@ -1,0 +1,66 @@
+[debug] [2025-05-27T13:20:09.923Z] ----------------------------------------------------------------------
+[debug] [2025-05-27T13:20:09.929Z] Command:       /opt/homebrew/Cellar/node/23.11.0/bin/node /opt/homebrew/bin/firebase deploy
+[debug] [2025-05-27T13:20:09.929Z] CLI Version:   14.4.0
+[debug] [2025-05-27T13:20:09.929Z] Platform:      darwin
+[debug] [2025-05-27T13:20:09.929Z] Node Version:  v23.11.0
+[debug] [2025-05-27T13:20:09.929Z] Time:          Tue May 27 2025 18:50:09 GMT+0530 (India Standard Time)
+[debug] [2025-05-27T13:20:09.929Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-05-27T13:20:10.018Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-05-27T13:20:10.018Z] > authorizing via signed-in user (nikhil.r@rapido.bike)
+[debug] [2025-05-27T13:20:10.018Z] [iam] checking project rapido-captain-test for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2025-05-27T13:20:10.019Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:10.019Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:10.019Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/rapido-captain-test:testIamPermissions [none]
+[debug] [2025-05-27T13:20:10.019Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/rapido-captain-test:testIamPermissions x-goog-quota-user=projects/rapido-captain-test
+[debug] [2025-05-27T13:20:10.019Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/rapido-captain-test:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-05-27T13:20:10.581Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/rapido-captain-test:testIamPermissions 200
+[debug] [2025-05-27T13:20:10.582Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/rapido-captain-test:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2025-05-27T13:20:10.582Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:10.582Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:10.583Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/rapido-captain-test [none]
+[debug] [2025-05-27T13:20:11.607Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/rapido-captain-test 200
+[debug] [2025-05-27T13:20:11.607Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/rapido-captain-test {"projectId":"rapido-captain-test","projectNumber":"468013252606","displayName":"Rapido captain test","name":"projects/rapido-captain-test","resources":{"hostingSite":"rapido-captain-test","realtimeDatabaseInstance":"rapido-captain-test"},"state":"ACTIVE","etag":"1_5053b61a-f235-41f7-a789-13892602bc9a"}
+[info] 
+[info] === Deploying to 'rapido-captain-test'...
+[info] 
+[info] i  deploying firestore, hosting 
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2025-05-27T13:20:11.610Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:11.610Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:11.610Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/rapido-captain-test:test [none]
+[debug] [2025-05-27T13:20:11.610Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/rapido-captain-test:test [omitted]
+[debug] [2025-05-27T13:20:12.144Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/rapido-captain-test:test 200
+[debug] [2025-05-27T13:20:12.144Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/rapido-captain-test:test {}
+[info] ✔  cloud.firestore: rules file firestore.rules compiled successfully 
+[debug] [2025-05-27T13:20:12.152Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:12.152Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:12.152Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/rapido-captain-test/versions [none]
+[debug] [2025-05-27T13:20:12.152Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/rapido-captain-test/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2025-05-27T13:20:13.523Z] <<< [apiv2][status] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/rapido-captain-test/versions 200
+[debug] [2025-05-27T13:20:13.524Z] <<< [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/rapido-captain-test/versions {"name":"projects/468013252606/sites/rapido-captain-test/versions/6c014d1e0caad29c","status":"CREATED","config":{},"labels":{"deployment-tool":"cli-firebase"}}
+[debug] [2025-05-27T13:20:13.525Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:13.526Z] Checked if tokens are valid: true, expires at: 1748355199887
+[info] i  firestore: deploying indexes... 
+[debug] [2025-05-27T13:20:13.527Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:13.527Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:13.527Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/rapido-captain-test/releases pageSize=10&pageToken=
+[debug] [2025-05-27T13:20:13.528Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/rapido-captain-test/databases/(default)/collectionGroups/-/indexes [none]
+[debug] [2025-05-27T13:20:14.876Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/rapido-captain-test/releases 200
+[debug] [2025-05-27T13:20:14.876Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/rapido-captain-test/releases {"releases":[{"name":"projects/rapido-captain-test/releases/cloud.firestore","rulesetName":"projects/rapido-captain-test/rulesets/20d57617-07c5-40af-a4f6-1f4843ba0d50","createTime":"2018-12-03T13:02:50.663724Z","updateTime":"2025-05-27T13:13:44.710630Z"}]}
+[debug] [2025-05-27T13:20:14.877Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:14.877Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:14.877Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/rapido-captain-test/rulesets/20d57617-07c5-40af-a4f6-1f4843ba0d50 [none]
+[debug] [2025-05-27T13:20:15.307Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/rapido-captain-test/databases/(default)/collectionGroups/-/indexes 200
+[debug] [2025-05-27T13:20:15.307Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/rapido-captain-test/databases/(default)/collectionGroups/-/indexes {"indexes":[{"name":"projects/rapido-captain-test/databases/(default)/collectionGroups/releases/indexes/CICAgOjXh4EK","queryScope":"COLLECTION","fields":[{"fieldPath":"projectId","order":"ASCENDING"},{"fieldPath":"createdAt","order":"DESCENDING"},{"fieldPath":"__name__","order":"DESCENDING"}],"state":"READY","density":"SPARSE_ALL"}]}
+[debug] [2025-05-27T13:20:15.308Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:15.308Z] Checked if tokens are valid: true, expires at: 1748355199887
+[debug] [2025-05-27T13:20:15.308Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/rapido-captain-test/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* [none]
+[debug] [2025-05-27T13:20:15.691Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/rapido-captain-test/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* 200
+[debug] [2025-05-27T13:20:15.691Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/rapido-captain-test/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* {"fields":[{"name":"projects/rapido-captain-test/databases/(default)/collectionGroups/__default__/fields/*","indexConfig":{"indexes":[{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"ASCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"DESCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","arrayConfig":"CONTAINS"}],"state":"READY"}]}}]}
+[info] i  firestore: The following indexes are defined in your project but are not present in your firestore indexes file:
+	(releases) -- (projectId,ASCENDING) (createdAt,DESCENDING)  
+[debug] [2025-05-27T13:20:16.265Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/rapido-captain-test/rulesets/20d57617-07c5-40af-a4f6-1f4843ba0d50 200
+[debug] [2025-05-27T13:20:16.266Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/rapido-captain-test/rulesets/20d57617-07c5-40af-a4f6-1f4843ba0d50 [omitted]
+[info] i  firestore: latest version of firestore.rules already up to date, skipping upload... 

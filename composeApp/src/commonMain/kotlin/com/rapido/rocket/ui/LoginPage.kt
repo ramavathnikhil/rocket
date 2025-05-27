@@ -13,7 +13,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun LoginPage(
     authRepository: FirebaseAuthRepository,
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    onNavigateToRegister: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -103,6 +104,15 @@ fun LoginPage(
                 } else {
                     Text("Login")
                 }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            TextButton(
+                onClick = onNavigateToRegister,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Don't have an account? Sign up")
             }
         }
     }

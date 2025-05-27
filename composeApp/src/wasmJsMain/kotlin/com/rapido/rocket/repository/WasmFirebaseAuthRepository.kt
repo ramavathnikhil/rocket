@@ -156,7 +156,16 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
             "createdAt" to user.createdAt,
             "updatedAt" to user.updatedAt
         )
+        
+        // Create user document with the same ID as auth UID
         usersCollection.doc(user.id).set(userData.toJsObject()).await()
+        
+        // Get the token and store it
+        authResult.user.getIdToken(true).then { token ->
+            localStorage.setItem(TOKEN_KEY, token.toString())
+            null
+        }
+        
         Result.success(user)
     } catch (e: Throwable) {
         Result.failure(e)

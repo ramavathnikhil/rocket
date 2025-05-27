@@ -9,13 +9,17 @@ import androidx.compose.ui.Modifier
 import com.rapido.rocket.repository.FirebaseAuthRepositoryFactory
 import com.rapido.rocket.ui.HomePage
 import com.rapido.rocket.ui.LoginPage
+import com.rapido.rocket.ui.screens.RegisterScreen
+import com.rapido.rocket.viewmodel.AuthViewModel
 
 @Composable
 fun App() {
     FirebaseApp.initialize()
     
     val authRepository = remember { FirebaseAuthRepositoryFactory.create() }
+    val authViewModel = remember { AuthViewModel(authRepository) }
     var isLoggedIn by remember { mutableStateOf(authRepository.isUserLoggedIn()) }
+    var showRegister by remember { mutableStateOf(false) }
 
     // Observe auth state changes
     LaunchedEffect(Unit) {
@@ -36,11 +40,21 @@ fun App() {
                             isLoggedIn = false
                         }
                     )
+                } else if (showRegister) {
+                    RegisterScreen(
+                        viewModel = authViewModel,
+                        onNavigateToLogin = {
+                            showRegister = false
+                        }
+                    )
                 } else {
                     LoginPage(
                         authRepository = authRepository,
                         onLoginSuccess = {
                             isLoggedIn = true
+                        },
+                        onNavigateToRegister = {
+                            showRegister = true
                         }
                     )
                 }
