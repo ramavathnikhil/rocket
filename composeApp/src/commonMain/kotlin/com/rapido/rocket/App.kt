@@ -28,15 +28,59 @@ fun App() {
     
     val authRepository = remember { FirebaseAuthRepositoryFactory.create() }
     val authViewModel = remember { AuthViewModel(authRepository) }
-    var isLoggedIn by remember { mutableStateOf(false) }
+    var isLoggedIn by remember { mutableStateOf<Boolean?>(null) } // null = unknown, true = logged in, false = not logged in
     var showRegister by remember { mutableStateOf(false) }
     var isInitialized by remember { mutableStateOf(false) }
+
+    // Wait for Firebase to restore auth state, with timeout
+    LaunchedEffect(Unit) {
+        println("Waiting for Firebase auth state restoration...")
+        var attempts = 0
+        val maxAttempts = 50 // 5 seconds total (50 * 100ms)
+        
+        while (attempts < maxAttempts && isLoggedIn == null) {
+            println("Attempt $attempts: Checking auth state...")
+            
+            // Check if we have a stored token
+            val hasToken = authRepository.isUserLoggedIn()
+            val token = authRepository.getAuthToken()
+            println("Has token: $hasToken, token: $token")
+            
+            if (hasToken) {
+                // Try to get current user
+                try {
+                    println("Attempting to get current user...")
+                    val currentUser = authRepository.getCurrentUser()
+                    println("Current user: $currentUser")
+                    if (currentUser != null) {
+                        println("Setting isLoggedIn to true")
+                        isLoggedIn = true
+                        break
+                    }
+                } catch (e: Exception) {
+                    println("Error getting current user: $e")
+                }
+            }
+            
+            // Wait a bit for Firebase to restore auth state
+            delay(100)
+            attempts++
+        }
+        
+        // If we still don't have a login state after waiting, assume not logged in
+        if (isLoggedIn == null) {
+            println("Timeout waiting for auth state, setting to false")
+            isLoggedIn = false
+        }
+    }
 
     // Observe auth state changes
     LaunchedEffect(Unit) {
         authRepository.observeAuthState().collect { user ->
-            println("Auth state changed, user: $user")
-            isLoggedIn = user != null
+            println("Auth state observer triggered, user: $user")
+            val newLoginState = user != null
+            println("Setting isLoggedIn to: $newLoginState")
+            isLoggedIn = newLoginState
         }
     }
 
@@ -58,49 +102,57 @@ fun App() {
             modifier = Modifier.fillMaxSize()
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                if (!isInitialized) {
-                    // Show loading while Firebase initializes
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                when {
+                    !isInitialized || isLoggedIn == null -> {
+                        // Show loading while Firebase initializes or checking auth state
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text("Initializing Firebase...")
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                CircularProgressIndicator()
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    if (!isInitialized) "Initializing Firebase..." 
+                                    else "Checking authentication..."
+                                )
+                            }
                         }
                     }
-                } else if (isLoggedIn) {
-                    println("Rendering HomePage")
-                    HomePage(
-                        authRepository = authRepository,
-                        onLogout = {
-                            isLoggedIn = false
-                        }
-                    )
-                } else if (showRegister) {
-                    println("Rendering RegisterScreen")
-                    RegisterScreen(
-                        viewModel = authViewModel,
-                        onNavigateToLogin = {
-                            showRegister = false
-                        }
-                    )
-                } else {
-                    println("Rendering LoginPage")
-                    LoginPage(
-                        authRepository = authRepository,
-                        onLoginSuccess = {
-                            println("Login success callback triggered")
-                            isLoggedIn = true
-                        },
-                        onNavigateToRegister = {
-                            showRegister = true
-                        }
-                    )
+                    isLoggedIn == true -> {
+                        println("Rendering HomePage")
+                        HomePage(
+                            authRepository = authRepository,
+                            onLogout = {
+                                isLoggedIn = false
+                            }
+                        )
+                    }
+                    showRegister -> {
+                        println("Rendering RegisterScreen")
+                        RegisterScreen(
+                            viewModel = authViewModel,
+                            onNavigateToLogin = {
+                                showRegister = false
+                            }
+                        )
+                    }
+                    else -> {
+                        println("Rendering LoginPage")
+                        LoginPage(
+                            authRepository = authRepository,
+                            onLoginSuccess = {
+                                println("Login success callback triggered")
+                                isLoggedIn = true
+                            },
+                            onNavigateToRegister = {
+                                showRegister = true
+                            }
+                        )
+                    }
                 }
             }
         }

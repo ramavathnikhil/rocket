@@ -104,36 +104,65 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
     private val TOKEN_KEY = "auth_token"
 
     init {
+        println("WasmFirebaseAuthRepository: Initializing auth state listener")
+        
+        // Check if there's already a current user (for page refresh scenarios)
+        val currentUser = auth.currentUser
+        println("WasmFirebaseAuthRepository: Initial current user: ${currentUser?.uid}")
+        
         auth.onAuthStateChanged { user ->
+            println("WasmFirebaseAuthRepository: Auth state changed, user: ${user?.uid}")
             if (user != null) {
                 scope.launch {
                     try {
                         val doc = usersCollection.doc(user.uid).get().await()
                         if (doc.exists) {
                             val data = doc.data()?.let { jsToMap(it) } ?: emptyMap()
-                            _authStateFlow.update {
-                                User(
-                                    id = data["id"] as? String ?: "",
-                                    email = data["email"] as? String ?: "",
-                                    username = data["username"] as? String ?: "",
-                                    role = UserRole.valueOf(data["role"] as? String ?: UserRole.USER.name),
-                                    status = UserStatus.valueOf(data["status"] as? String ?: UserStatus.PENDING_APPROVAL.name),
-                                    createdAt = (data["createdAt"] as? Number)?.toLong() ?: currentTimeMillis(),
-                                    updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: currentTimeMillis()
-                                )
-                            }
+                            val userData = User(
+                                id = data["id"] as? String ?: user.uid,
+                                email = data["email"] as? String ?: user.email ?: "",
+                                username = data["username"] as? String ?: "",
+                                role = UserRole.valueOf(data["role"] as? String ?: UserRole.USER.name),
+                                status = UserStatus.valueOf(data["status"] as? String ?: UserStatus.PENDING_APPROVAL.name),
+                                createdAt = (data["createdAt"] as? Number)?.toLong() ?: currentTimeMillis(),
+                                updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: currentTimeMillis()
+                            )
+                            println("WasmFirebaseAuthRepository: Setting user in auth state: $userData")
+                            _authStateFlow.update { userData }
                             // Store token on successful auth
                             user.getIdToken(true).then { token ->
                                 localStorage.setItem(TOKEN_KEY, token.toString())
+                                println("WasmFirebaseAuthRepository: Token stored in localStorage")
+                                null
+                            }
+                        } else {
+                            println("WasmFirebaseAuthRepository: User document does not exist, creating minimal user")
+                            // Create a minimal user object even if document doesn't exist
+                            val userData = User(
+                                id = user.uid,
+                                email = user.email ?: "",
+                                username = "",
+                                role = UserRole.USER,
+                                status = UserStatus.PENDING_APPROVAL,
+                                createdAt = currentTimeMillis(),
+                                updatedAt = currentTimeMillis()
+                            )
+                            _authStateFlow.update { userData }
+                            // Store token anyway
+                            user.getIdToken(true).then { token ->
+                                localStorage.setItem(TOKEN_KEY, token.toString())
+                                println("WasmFirebaseAuthRepository: Token stored in localStorage")
                                 null
                             }
                         }
                     } catch (e: Throwable) {
+                        println("WasmFirebaseAuthRepository: Error in auth state change: $e")
                         _authStateFlow.update { null }
                         localStorage.removeItem(TOKEN_KEY)
                     }
                 }
             } else {
+                println("WasmFirebaseAuthRepository: User is null, clearing auth state")
                 _authStateFlow.update { null }
                 localStorage.removeItem(TOKEN_KEY)
             }
@@ -205,18 +234,36 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
     }
 
     override suspend fun getCurrentUser(): User? {
-        val firebaseUser = auth.currentUser ?: return null
-        val doc = usersCollection.doc(firebaseUser.uid).get().await()
-        val data = doc.data()?.let { jsToMap(it) } ?: emptyMap()
-        return User(
-            id = data["id"] as? String ?: "",
-            email = data["email"] as? String ?: "",
-            username = data["username"] as? String ?: "",
-            role = UserRole.valueOf(data["role"] as? String ?: UserRole.USER.name),
-            status = UserStatus.valueOf(data["status"] as? String ?: UserStatus.PENDING_APPROVAL.name),
-            createdAt = (data["createdAt"] as? Number)?.toLong() ?: currentTimeMillis(),
-            updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: currentTimeMillis()
-        )
+        println("WasmFirebaseAuthRepository: getCurrentUser called")
+        val firebaseUser = auth.currentUser
+        println("WasmFirebaseAuthRepository: Firebase currentUser: ${firebaseUser?.uid}")
+        
+        if (firebaseUser == null) {
+            println("WasmFirebaseAuthRepository: No current Firebase user")
+            return null
+        }
+        
+        try {
+            val doc = usersCollection.doc(firebaseUser.uid).get().await()
+            println("WasmFirebaseAuthRepository: Document exists: ${doc.exists}")
+            val data = doc.data()?.let { jsToMap(it) } ?: emptyMap()
+            println("WasmFirebaseAuthRepository: Document data: $data")
+            
+            val user = User(
+                id = data["id"] as? String ?: firebaseUser.uid,
+                email = data["email"] as? String ?: firebaseUser.email ?: "",
+                username = data["username"] as? String ?: "",
+                role = UserRole.valueOf(data["role"] as? String ?: UserRole.USER.name),
+                status = UserStatus.valueOf(data["status"] as? String ?: UserStatus.PENDING_APPROVAL.name),
+                createdAt = (data["createdAt"] as? Number)?.toLong() ?: currentTimeMillis(),
+                updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: currentTimeMillis()
+            )
+            println("WasmFirebaseAuthRepository: Returning user: $user")
+            return user
+        } catch (e: Throwable) {
+            println("WasmFirebaseAuthRepository: Error getting current user: $e")
+            return null
+        }
     }
 
     override fun observeAuthState(): Flow<User?> = _authStateFlow
@@ -239,9 +286,29 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
         Result.failure(e)
     }
 
-    override fun isUserLoggedIn(): Boolean = getAuthToken() != null
+    override fun isUserLoggedIn(): Boolean {
+        val token = getAuthToken()
+        val hasToken = token != null
+        println("WasmFirebaseAuthRepository: isUserLoggedIn - token: $token, hasToken: $hasToken")
+        return hasToken
+    }
 
-    override fun getAuthToken(): String? = localStorage.getItem(TOKEN_KEY)
+    override fun getAuthToken(): String? {
+        try {
+            // Test localStorage access
+            localStorage.setItem("test", "test_value")
+            val testValue = localStorage.getItem("test")
+            println("WasmFirebaseAuthRepository: localStorage test - set: test_value, got: $testValue")
+            localStorage.removeItem("test")
+            
+            val token = localStorage.getItem(TOKEN_KEY)
+            println("WasmFirebaseAuthRepository: getAuthToken - token: $token")
+            return token
+        } catch (e: Throwable) {
+            println("WasmFirebaseAuthRepository: Error accessing localStorage: $e")
+            return null
+        }
+    }
 
     override fun signInWithEmailAndPassword(email: String, password: String, onResult: (Boolean) -> Unit) {
         try {
