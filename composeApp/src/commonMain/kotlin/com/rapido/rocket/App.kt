@@ -24,6 +24,8 @@ import com.rapido.rocket.ui.LoginPage
 import com.rapido.rocket.ui.screens.RegisterScreen
 import com.rapido.rocket.ui.screens.AdminUserManagementScreen
 import com.rapido.rocket.ui.screens.TestUserCreationScreen
+import com.rapido.rocket.ui.screens.ProjectDetailScreen
+import com.rapido.rocket.ui.screens.ReleaseDetailScreen
 import com.rapido.rocket.ui.theme.RapidoRocketTheme
 import com.rapido.rocket.ui.theme.ThemeManager
 import com.rapido.rocket.ui.theme.rememberThemeManager
@@ -113,6 +115,13 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager:
     var showRegister by remember { mutableStateOf(false) }
     var showAdminPanel by remember { mutableStateOf(false) }
     var showTestUsers by remember { mutableStateOf(false) }
+    
+    // New navigation states for project management
+    var showProjectsList by remember { mutableStateOf(false) }
+    var showCreateProject by remember { mutableStateOf(false) }
+    var currentProjectId by remember { mutableStateOf<String?>(null) }
+    var currentReleaseId by remember { mutableStateOf<String?>(null) }
+    
     var isInitialized by remember { mutableStateOf(false) }
 
     // Wait for Firebase to restore auth state, with timeout
@@ -201,6 +210,76 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager:
                             }
                         }
                     }
+                    isLoggedIn == true && currentReleaseId != null -> {
+                        println("Rendering ReleaseDetailScreen for release: $currentReleaseId")
+                        ReleaseDetailScreen(
+                            releaseId = currentReleaseId!!,
+                            authRepository = authRepository,
+                            onBack = {
+                                currentReleaseId = null
+                                // Go back to project detail if we have a project
+                                if (currentProjectId == null) {
+                                    showProjectsList = true
+                                }
+                            },
+                            onEditRelease = {
+                                // TODO: Navigate to edit release screen
+                                println("Edit release: $currentReleaseId")
+                            }
+                        )
+                    }
+                    isLoggedIn == true && currentProjectId != null -> {
+                        println("Rendering ProjectDetailScreen for project: $currentProjectId")
+                        ProjectDetailScreen(
+                            projectId = currentProjectId!!,
+                            authRepository = authRepository,
+                            onBack = {
+                                currentProjectId = null
+                                showProjectsList = true
+                            },
+                            onCreateRelease = {
+                                // TODO: Navigate to create release screen
+                                println("Create release for project: $currentProjectId")
+                            },
+                            onReleaseClick = { releaseId ->
+                                println("Navigate to release: $releaseId")
+                                currentReleaseId = releaseId
+                            }
+                        )
+                    }
+                    isLoggedIn == true && showCreateProject -> {
+                        println("Rendering CreateProjectScreen")
+                        com.rapido.rocket.ui.screens.CreateProjectScreen(
+                            authRepository = authRepository,
+                            onBack = {
+                                showCreateProject = false
+                            },
+                            onProjectCreated = { project ->
+                                println("Project created: ${project.name}")
+                                showCreateProject = false
+                                // Optionally navigate to project details or projects list
+                                showProjectsList = true
+                            }
+                        )
+                    }
+                    isLoggedIn == true && showProjectsList -> {
+                        println("Rendering ProjectsListScreen")
+                        com.rapido.rocket.ui.screens.ProjectsListScreen(
+                            authRepository = authRepository,
+                            onBack = {
+                                showProjectsList = false
+                            },
+                            onProjectClick = { projectId ->
+                                println("Navigate to project: $projectId")
+                                currentProjectId = projectId
+                                showProjectsList = false
+                            },
+                            onCreateProject = {
+                                showProjectsList = false
+                                showCreateProject = true
+                            }
+                        )
+                    }
                     isLoggedIn == true && showAdminPanel -> {
                         println("Rendering AdminUserManagementScreen")
                         com.rapido.rocket.ui.screens.AdminUserManagementScreen(
@@ -232,6 +311,18 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager:
                             },
                             onNavigateToTestUsers = {
                                 showTestUsers = true
+                            },
+                            onNavigateToProjects = {
+                                showProjectsList = true
+                            },
+                            onNavigateToCreateProject = {
+                                showCreateProject = true
+                            },
+                            onNavigateToProject = { projectId ->
+                                currentProjectId = projectId
+                            },
+                            onNavigateToRelease = { releaseId ->
+                                currentReleaseId = releaseId
                             }
                         )
                     }
