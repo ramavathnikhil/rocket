@@ -22,6 +22,8 @@ import com.rapido.rocket.repository.FirebaseAuthRepositoryFactory
 import com.rapido.rocket.ui.HomePage
 import com.rapido.rocket.ui.LoginPage
 import com.rapido.rocket.ui.screens.RegisterScreen
+import com.rapido.rocket.ui.screens.AdminUserManagementScreen
+import com.rapido.rocket.ui.screens.TestUserCreationScreen
 import com.rapido.rocket.viewmodel.AuthViewModel
 
 @Composable
@@ -105,6 +107,8 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository) {
     val authViewModel = remember { AuthViewModel(authRepository) }
     var isLoggedIn by remember { mutableStateOf<Boolean?>(null) } // null = unknown, true = logged in, false = not logged in
     var showRegister by remember { mutableStateOf(false) }
+    var showAdminPanel by remember { mutableStateOf(false) }
+    var showTestUsers by remember { mutableStateOf(false) }
     var isInitialized by remember { mutableStateOf(false) }
 
     // Wait for Firebase to restore auth state, with timeout
@@ -193,12 +197,36 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository) {
                             }
                         }
                     }
+                    isLoggedIn == true && showAdminPanel -> {
+                        println("Rendering AdminUserManagementScreen")
+                        com.rapido.rocket.ui.screens.AdminUserManagementScreen(
+                            authRepository = authRepository,
+                            onBack = {
+                                showAdminPanel = false
+                            }
+                        )
+                    }
+                    isLoggedIn == true && showTestUsers -> {
+                        println("Rendering TestUserCreationScreen")
+                        com.rapido.rocket.ui.screens.TestUserCreationScreen(
+                            authRepository = authRepository,
+                            onBack = {
+                                showTestUsers = false
+                            }
+                        )
+                    }
                     isLoggedIn == true -> {
                         println("Rendering HomePage")
                         HomePage(
                             authRepository = authRepository,
                             onLogout = {
                                 isLoggedIn = false
+                            },
+                            onNavigateToAdminPanel = {
+                                showAdminPanel = true
+                            },
+                            onNavigateToTestUsers = {
+                                showTestUsers = true
                             }
                         )
                     }

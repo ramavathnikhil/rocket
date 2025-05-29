@@ -12,7 +12,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomePage(
     authRepository: FirebaseAuthRepository,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigateToAdminPanel: () -> Unit = {},
+    onNavigateToTestUsers: () -> Unit = {}
 ) {
     var isLoading by remember { mutableStateOf(false) }
     var currentUser by remember { mutableStateOf<com.rapido.rocket.model.User?>(null) }
@@ -104,13 +106,19 @@ fun HomePage(
                             )
                             
                             Button(
-                                onClick = {
-                                    // TODO: Navigate to user management screen
-                                    println("Navigate to user management")
-                                },
+                                onClick = onNavigateToAdminPanel,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("Manage Users")
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            OutlinedButton(
+                                onClick = onNavigateToTestUsers,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Create Test Users")
                             }
                         }
                     }

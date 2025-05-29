@@ -47,6 +47,12 @@ external interface FirebaseFirestore : JsAny {
 
 external interface FirebaseCollection : JsAny {
     fun doc(path: String): FirebaseDocument
+    fun get(): Promise<FirebaseQuerySnapshot>
+}
+
+external interface FirebaseQuerySnapshot : JsAny {
+    val docs: JsAny
+    fun forEach(callback: (FirebaseDoc) -> Unit)
 }
 
 external interface FirebaseDocument : JsAny {
@@ -406,10 +412,54 @@ class WasmFirebaseAuthRepository : FirebaseAuthRepository {
 
     override suspend fun getAllUsers(): Result<List<User>> = try {
         println("WasmFirebaseAuthRepository: Getting all users")
-        // Note: This would require a different approach in WASM as we can't directly query collections
-        // For now, we'll return an empty list and log that this feature needs admin implementation
-        println("WasmFirebaseAuthRepository: getAllUsers not fully implemented in WASM - requires admin panel")
-        Result.success(emptyList())
+        
+        val usersList = mutableListOf<User>()
+        
+        try {
+            // Get all documents from the users collection
+            val querySnapshot = usersCollection.get().await()
+            
+            // Convert the query snapshot to a list of users
+            val docs = mutableListOf<FirebaseDoc>()
+            querySnapshot.forEach { doc ->
+                docs.add(doc)
+            }
+            
+            println("WasmFirebaseAuthRepository: Found ${docs.size} user documents")
+            
+            for (doc in docs) {
+                if (doc.exists) {
+                    try {
+                        val data = doc.data()?.let { jsToMap(it) } ?: emptyMap()
+                        val user = User(
+                            id = data["id"] as? String ?: "",
+                            email = data["email"] as? String ?: "",
+                            username = data["username"] as? String ?: "",
+                            role = UserRole.valueOf(data["role"] as? String ?: UserRole.USER.name),
+                            status = UserStatus.valueOf(data["status"] as? String ?: UserStatus.PENDING_APPROVAL.name),
+                            createdAt = (data["createdAt"] as? Number)?.toLong() ?: currentTimeMillis(),
+                            updatedAt = (data["updatedAt"] as? Number)?.toLong() ?: currentTimeMillis()
+                        )
+                        usersList.add(user)
+                        println("WasmFirebaseAuthRepository: Added user: ${user.email}")
+                    } catch (parseError: Exception) {
+                        println("WasmFirebaseAuthRepository: Error parsing user document: $parseError")
+                    }
+                }
+            }
+            
+            println("WasmFirebaseAuthRepository: Successfully loaded ${usersList.size} users")
+            Result.success(usersList)
+        } catch (e: Exception) {
+            println("WasmFirebaseAuthRepository: Error fetching users from Firestore: $e")
+            // Fallback: return current user if available
+            val currentUser = getCurrentUser()
+            if (currentUser != null) {
+                Result.success(listOf(currentUser))
+            } else {
+                Result.success(emptyList())
+            }
+        }
     } catch (e: Throwable) {
         println("WasmFirebaseAuthRepository: Error getting all users: $e")
         Result.failure(e)
