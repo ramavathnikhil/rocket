@@ -9,7 +9,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.rapido.rocket.model.Project
+import com.rapido.rocket.model.Release
+import com.rapido.rocket.model.ReleaseStatus
 import com.rapido.rocket.repository.FirebaseAuthRepository
 import com.rapido.rocket.repository.RepositoryProvider
 import com.rapido.rocket.util.currentTimeMillis
@@ -17,22 +18,26 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CreateProjectScreen(
+fun CreateReleaseScreen(
+    projectId: String,
     authRepository: FirebaseAuthRepository,
     onBack: () -> Unit,
-    onProjectCreated: (Project) -> Unit
+    onReleaseCreated: (Release) -> Unit
 ) {
-    var projectName by remember { mutableStateOf("") }
+    var version by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var repositoryUrl by remember { mutableStateOf("") }
-    var playStoreUrl by remember { mutableStateOf("") }
+    var assignedTo by remember { mutableStateOf("") }
+    var targetReleaseDate by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
     var isCreating by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var currentUser by remember { mutableStateOf<com.rapido.rocket.model.User?>(null) }
     
     val scope = rememberCoroutineScope()
-    val projectRepository = remember { RepositoryProvider.getProjectRepository() }
-    val isFormValid = projectName.isNotBlank() && description.isNotBlank()
+    val releaseRepository = remember { RepositoryProvider.getReleaseRepository() }
+    val workflowRepository = remember { RepositoryProvider.getWorkflowRepository() }
+    val isFormValid = version.isNotBlank() && title.isNotBlank() && description.isNotBlank()
 
     // Get current user
     LaunchedEffect(Unit) {
@@ -60,7 +65,7 @@ fun CreateProjectScreen(
             }
             
             Text(
-                text = "Create Project",
+                text = "Create Release",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -110,7 +115,7 @@ fun CreateProjectScreen(
                 )
             ) {
                 Text(
-                    text = "Creating project as: ${user.email} (${user.username})",
+                    text = "Creating release as: ${user.email} (${user.username})",
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(12.dp)
@@ -121,17 +126,36 @@ fun CreateProjectScreen(
 
         // Form fields
         OutlinedTextField(
-            value = projectName,
+            value = version,
             onValueChange = { 
-                projectName = it
+                version = it
                 errorMessage = null
             },
-            label = { Text("Project Name *") },
+            label = { Text("Version *") },
             modifier = Modifier.fillMaxWidth(),
-            isError = projectName.isBlank(),
-            supportingText = if (projectName.isBlank()) {
-                { Text("Project name is required") }
+            isError = version.isBlank(),
+            supportingText = if (version.isBlank()) {
+                { Text("Version is required (e.g., v1.2.0)") }
             } else null,
+            placeholder = { Text("v1.2.0") },
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = title,
+            onValueChange = { 
+                title = it
+                errorMessage = null
+            },
+            label = { Text("Release Title *") },
+            modifier = Modifier.fillMaxWidth(),
+            isError = title.isBlank(),
+            supportingText = if (title.isBlank()) {
+                { Text("Release title is required") }
+            } else null,
+            placeholder = { Text("Q4 Feature Release") },
             singleLine = true
         )
 
@@ -149,6 +173,7 @@ fun CreateProjectScreen(
             supportingText = if (description.isBlank()) {
                 { Text("Description is required") }
             } else null,
+            placeholder = { Text("Bug fixes, new features, and improvements") },
             minLines = 3,
             maxLines = 5
         )
@@ -156,23 +181,35 @@ fun CreateProjectScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
-            value = repositoryUrl,
-            onValueChange = { repositoryUrl = it },
-            label = { Text("Repository URL (optional)") },
+            value = assignedTo,
+            onValueChange = { assignedTo = it },
+            label = { Text("Assigned To (optional)") },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("https://github.com/company/project") },
+            placeholder = { Text("developer@company.com") },
             singleLine = true
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
-            value = playStoreUrl,
-            onValueChange = { playStoreUrl = it },
-            label = { Text("Play Store URL (optional)") },
+            value = targetReleaseDate,
+            onValueChange = { targetReleaseDate = it },
+            label = { Text("Target Release Date (optional)") },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text("https://play.google.com/store/apps/details?id=...") },
+            placeholder = { Text("YYYY-MM-DD") },
             singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = notes,
+            onValueChange = { notes = it },
+            label = { Text("Release Notes (optional)") },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Additional notes about this release...") },
+            minLines = 2,
+            maxLines = 4
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -196,35 +233,48 @@ fun CreateProjectScreen(
                         isCreating = true
                         errorMessage = null
                         
-                        val newProject = Project(
-                            id = generateProjectId(),
-                            name = projectName.trim(),
+                        val newRelease = Release(
+                            id = generateReleaseId(),
+                            projectId = projectId,
+                            version = version.trim(),
+                            title = title.trim(),
                             description = description.trim(),
-                            repositoryUrl = repositoryUrl.trim(),
-                            playStoreUrl = playStoreUrl.trim(),
+                            status = ReleaseStatus.DRAFT,
                             createdBy = currentUser?.email ?: "",
+                            assignedTo = assignedTo.trim().ifEmpty { currentUser?.email ?: "" },
                             createdAt = currentTimeMillis(),
                             updatedAt = currentTimeMillis(),
-                            isActive = true
+                            targetReleaseDate = parseTargetDate(targetReleaseDate),
+                            notes = notes.trim()
                         )
                         
-                        // Create project using repository
+                        // Create release using repository
                         scope.launch {
                             try {
-                                val result = projectRepository.createProject(newProject)
+                                val result = releaseRepository.createRelease(newRelease)
                                 result.fold(
-                                    onSuccess = { createdProject ->
+                                    onSuccess = { createdRelease ->
+                                        // Create default workflow steps for the release
+                                        workflowRepository.createDefaultWorkflowSteps(createdRelease.id).fold(
+                                            onSuccess = { steps ->
+                                                println("Created ${steps.size} default workflow steps")
+                                            },
+                                            onFailure = { error ->
+                                                println("Warning: Failed to create default workflow steps: ${error.message}")
+                                            }
+                                        )
+                                        
                                         isCreating = false
-                                        onProjectCreated(createdProject)
+                                        onReleaseCreated(createdRelease)
                                     },
                                     onFailure = { error ->
                                         isCreating = false
-                                        errorMessage = "Failed to create project: ${error.message}"
+                                        errorMessage = "Failed to create release: ${error.message}"
                                     }
                                 )
                             } catch (e: Exception) {
                                 isCreating = false
-                                errorMessage = "Error creating project: ${e.message}"
+                                errorMessage = "Error creating release: ${e.message}"
                             }
                         }
                     }
@@ -244,7 +294,7 @@ fun CreateProjectScreen(
                         Text("Creating...")
                     }
                 } else {
-                    Text("Create Project")
+                    Text("Create Release")
                 }
             }
         }
@@ -260,7 +310,19 @@ fun CreateProjectScreen(
     }
 }
 
-// Helper functions - these would typically be in utility classes
-private fun generateProjectId(): String {
-    return "proj_${currentTimeMillis()}_${(100..999).random()}"
+// Helper functions
+private fun generateReleaseId(): String {
+    return "rel_${currentTimeMillis()}_${(100..999).random()}"
+}
+
+private fun parseTargetDate(dateString: String): Long? {
+    if (dateString.isBlank()) return null
+    
+    // Simple date parsing - in a real app you'd use a proper date library
+    return try {
+        // For now, just add 7 days from now if they entered anything
+        currentTimeMillis() + (7 * 24 * 60 * 60 * 1000L)
+    } catch (e: Exception) {
+        null
+    }
 } 

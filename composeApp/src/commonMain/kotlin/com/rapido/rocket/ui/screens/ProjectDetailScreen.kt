@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rapido.rocket.model.*
 import com.rapido.rocket.repository.FirebaseAuthRepository
+import com.rapido.rocket.repository.RepositoryProvider
 import com.rapido.rocket.util.currentTimeMillis
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,140 +31,55 @@ fun ProjectDetailScreen(
     var workflowSteps by remember { mutableStateOf<Map<String, List<WorkflowStep>>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableStateOf(0) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // TODO: Load data from repositories
+    val projectRepository = remember { RepositoryProvider.getProjectRepository() }
+    val releaseRepository = remember { RepositoryProvider.getReleaseRepository() }
+    val workflowRepository = remember { RepositoryProvider.getWorkflowRepository() }
+
+    // Load data from repositories
     LaunchedEffect(projectId) {
-        // Simulate loading
-        kotlinx.coroutines.delay(1000)
-        
-        // Mock project data
-        project = Project(
-            id = projectId,
-            name = "Rapido Customer App",
-            description = "Main customer facing application for ride booking and management",
-            repositoryUrl = "https://github.com/company/rapido-customer",
-            playStoreUrl = "https://play.google.com/store/apps/details?id=com.rapido.customer",
-            createdBy = "john@company.com",
-            isActive = true
-        )
-        
-        // Mock releases data
-        releases = listOf(
-            Release(
-                id = "rel_1",
-                projectId = projectId,
-                version = "v2.1.0",
-                title = "Enhanced Booking Experience",
-                description = "Improved UI for booking, better location search, and bug fixes",
-                status = ReleaseStatus.IN_PROGRESS,
-                createdBy = "jane@company.com",
-                assignedTo = "mike@company.com",
-                targetReleaseDate = currentTimeMillis() + (7 * 24 * 60 * 60 * 1000L)
-            ),
-            Release(
-                id = "rel_2",
-                projectId = projectId,
-                version = "v2.0.5",
-                title = "Critical Bug Fixes",
-                description = "Fixed payment issues and crash on Android 14",
-                status = ReleaseStatus.PRODUCTION,
-                createdBy = "sarah@company.com",
-                assignedTo = "sarah@company.com",
-                targetReleaseDate = currentTimeMillis() - (3 * 24 * 60 * 60 * 1000L)
-            ),
-            Release(
-                id = "rel_3",
-                projectId = projectId,
-                version = "v2.1.1",
-                title = "Performance Improvements",
-                description = "Optimized app startup time and reduced memory usage",
-                status = ReleaseStatus.DRAFT,
-                createdBy = "alex@company.com",
-                assignedTo = "alex@company.com"
+        try {
+            // Load project
+            val projectResult = projectRepository.getProject(projectId)
+            projectResult.fold(
+                onSuccess = { loadedProject ->
+                    project = loadedProject
+                },
+                onFailure = { error ->
+                    errorMessage = "Failed to load project: ${error.message}"
+                }
             )
-        )
-        
-        // Mock workflow steps for each release
-        workflowSteps = mapOf(
-            "rel_1" to listOf(
-                WorkflowStep(
-                    id = "step_1_1",
-                    releaseId = "rel_1",
-                    stepNumber = 1,
-                    type = StepType.PR_MERGE,
-                    title = "Merge Develop to Release",
-                    description = "Create and merge PR from develop branch to release branch",
-                    status = StepStatus.COMPLETED,
-                    assignedTo = "dev@company.com",
-                    completedBy = "dev@company.com"
-                ),
-                WorkflowStep(
-                    id = "step_1_2",
-                    releaseId = "rel_1",
-                    stepNumber = 2,
-                    type = StepType.BUILD_STAGING,
-                    title = "Build Staging APK",
-                    description = "Run GitHub Actions to build and share staging build",
-                    status = StepStatus.COMPLETED,
-                    assignedTo = "ci@company.com",
-                    completedBy = "ci@company.com"
-                ),
-                WorkflowStep(
-                    id = "step_1_3",
-                    releaseId = "rel_1",
-                    stepNumber = 3,
-                    type = StepType.STAGING_SIGNOFF,
-                    title = "Staging Signoff",
-                    description = "Get approval for staging build from stakeholders",
-                    status = StepStatus.IN_PROGRESS,
-                    assignedTo = "pm@company.com"
-                ),
-                WorkflowStep(
-                    id = "step_1_4",
-                    releaseId = "rel_1",
-                    stepNumber = 4,
-                    type = StepType.PR_TO_MASTER,
-                    title = "Create PR to Master",
-                    description = "Create PR from release branch to master branch",
-                    status = StepStatus.PENDING,
-                    assignedTo = "dev@company.com"
-                )
-            ),
-            "rel_2" to listOf(
-                WorkflowStep(
-                    id = "step_2_1",
-                    releaseId = "rel_2",
-                    stepNumber = 1,
-                    type = StepType.PR_MERGE,
-                    title = "Merge Develop to Release",
-                    status = StepStatus.COMPLETED,
-                    assignedTo = "dev@company.com",
-                    completedBy = "dev@company.com"
-                ),
-                WorkflowStep(
-                    id = "step_2_2",
-                    releaseId = "rel_2",
-                    stepNumber = 2,
-                    type = StepType.BUILD_STAGING,
-                    title = "Build Staging APK",
-                    status = StepStatus.COMPLETED,
-                    assignedTo = "ci@company.com",
-                    completedBy = "ci@company.com"
-                ),
-                WorkflowStep(
-                    id = "step_2_3",
-                    releaseId = "rel_2",
-                    stepNumber = 3,
-                    type = StepType.PROMOTE_PRODUCTION,
-                    title = "Promote to Production",
-                    status = StepStatus.COMPLETED,
-                    assignedTo = "ops@company.com",
-                    completedBy = "ops@company.com"
-                )
+
+            // Load releases for this project
+            val releasesResult = releaseRepository.getReleasesByProject(projectId)
+            releasesResult.fold(
+                onSuccess = { releasesList ->
+                    releases = releasesList
+                    
+                    // Load workflow steps for each release
+                    val stepsMap = mutableMapOf<String, List<WorkflowStep>>()
+                    releasesList.forEach { release ->
+                        val stepsResult = workflowRepository.getWorkflowStepsByRelease(release.id)
+                        stepsResult.fold(
+                            onSuccess = { steps ->
+                                stepsMap[release.id] = steps
+                            },
+                            onFailure = { /* Ignore individual step loading failures */ }
+                        )
+                    }
+                    workflowSteps = stepsMap
+                },
+                onFailure = { error ->
+                    errorMessage = "Failed to load releases: ${error.message}"
+                }
             )
-        )
-        
-        isLoading = false
+            
+            isLoading = false
+        } catch (e: Exception) {
+            errorMessage = "Error loading project data: ${e.message}"
+            isLoading = false
+        }
     }
 
     if (isLoading) {

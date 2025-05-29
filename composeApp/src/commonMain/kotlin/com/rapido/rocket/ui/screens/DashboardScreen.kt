@@ -12,6 +12,7 @@ import com.rapido.rocket.model.Project
 import com.rapido.rocket.model.Release
 import com.rapido.rocket.model.ReleaseStatus
 import com.rapido.rocket.repository.FirebaseAuthRepository
+import com.rapido.rocket.repository.RepositoryProvider
 import com.rapido.rocket.ui.theme.ThemeManager
 
 @Composable
@@ -28,6 +29,10 @@ fun DashboardScreen(
     var recentReleases by remember { mutableStateOf<List<Release>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var currentUser by remember { mutableStateOf<com.rapido.rocket.model.User?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val projectRepository = remember { RepositoryProvider.getProjectRepository() }
+    val releaseRepository = remember { RepositoryProvider.getReleaseRepository() }
 
     // Observe current user
     LaunchedEffect(Unit) {
@@ -36,54 +41,72 @@ fun DashboardScreen(
         }
     }
 
-    // TODO: Load projects and releases from repositories
+    // Load projects and releases from repositories
     LaunchedEffect(Unit) {
-        // Simulate loading data
-        kotlinx.coroutines.delay(1000)
-        
-        // Mock data for now
-        projects = listOf(
-            Project(
-                id = "1",
-                name = "Rapido Customer App",
-                description = "Main customer facing application",
-                repositoryUrl = "https://github.com/company/rapido-customer",
-                createdBy = "john@company.com"
-            ),
-            Project(
-                id = "2",
-                name = "Rapido Driver App",
-                description = "Driver application for ride management",
-                repositoryUrl = "https://github.com/company/rapido-driver",
-                createdBy = "jane@company.com"
+        try {
+            // Load projects
+            val projectsResult = projectRepository.getAllProjects()
+            projectsResult.fold(
+                onSuccess = { projectsList ->
+                    projects = projectsList.take(5) // Show recent 5 projects
+                },
+                onFailure = { error ->
+                    errorMessage = "Failed to load projects: ${error.message}"
+                }
             )
-        )
-        
-        recentReleases = listOf(
-            Release(
-                id = "1",
-                projectId = "1",
-                version = "2.4.0",
-                title = "Q4 Release",
-                status = ReleaseStatus.IN_PROGRESS,
-                createdBy = "john@company.com"
-            ),
-            Release(
-                id = "2",
-                projectId = "2",
-                version = "1.8.5",
-                title = "Hotfix Release",
-                status = ReleaseStatus.STAGING,
-                createdBy = "jane@company.com"
-            )
-        )
-        
-        isLoading = false
+
+            // Observe releases for real-time updates
+            releaseRepository.observeReleases().collect { allReleases ->
+                recentReleases = allReleases
+                    .filter { it.status == ReleaseStatus.IN_PROGRESS || it.status == ReleaseStatus.STAGING }
+                    .sortedByDescending { it.updatedAt }
+                    .take(5)
+                isLoading = false
+            }
+        } catch (e: Exception) {
+            errorMessage = "Error loading dashboard data: ${e.message}"
+            isLoading = false
+        }
     }
 
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
+        // Error message display
+        errorMessage?.let { error ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = { 
+                            errorMessage = null
+                            isLoading = true
+                        }
+                    ) {
+                        Text("Retry")
+                    }
+                }
+            }
+        }
+
         // Theme toggle button in top-right corner
         IconButton(
             onClick = { themeManager.toggleTheme() },

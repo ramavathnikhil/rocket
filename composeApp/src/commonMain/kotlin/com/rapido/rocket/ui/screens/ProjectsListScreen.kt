@@ -10,6 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rapido.rocket.model.Project
 import com.rapido.rocket.repository.FirebaseAuthRepository
+import com.rapido.rocket.repository.RepositoryProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,51 +23,38 @@ fun ProjectsListScreen(
     var projects by remember { mutableStateOf<List<Project>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var searchQuery by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // TODO: Load projects from repository
+    val projectRepository = remember { RepositoryProvider.getProjectRepository() }
+
+    // Load projects from repository
     LaunchedEffect(Unit) {
-        // Simulate loading data
-        kotlinx.coroutines.delay(1000)
-        
-        // Mock data for now
-        projects = listOf(
-            Project(
-                id = "1",
-                name = "Rapido Customer App",
-                description = "Main customer facing application for ride booking",
-                repositoryUrl = "https://github.com/company/rapido-customer",
-                playStoreUrl = "https://play.google.com/store/apps/details?id=com.rapido.customer",
-                createdBy = "john@company.com",
-                isActive = true
-            ),
-            Project(
-                id = "2",
-                name = "Rapido Driver App",
-                description = "Driver application for ride management and earnings",
-                repositoryUrl = "https://github.com/company/rapido-driver",
-                playStoreUrl = "https://play.google.com/store/apps/details?id=com.rapido.driver",
-                createdBy = "jane@company.com",
-                isActive = true
-            ),
-            Project(
-                id = "3",
-                name = "Rapido Admin Portal",
-                description = "Administrative web portal for operations management",
-                repositoryUrl = "https://github.com/company/rapido-admin",
-                createdBy = "admin@company.com",
-                isActive = true
-            ),
-            Project(
-                id = "4",
-                name = "Legacy Customer App",
-                description = "Previous version of customer app (deprecated)",
-                repositoryUrl = "https://github.com/company/rapido-customer-legacy",
-                createdBy = "legacy@company.com",
-                isActive = false
+        try {
+            val result = projectRepository.getAllProjects()
+            result.fold(
+                onSuccess = { projectsList ->
+                    projects = projectsList
+                    isLoading = false
+                },
+                onFailure = { error ->
+                    errorMessage = "Failed to load projects: ${error.message}"
+                    isLoading = false
+                }
             )
-        )
-        
-        isLoading = false
+        } catch (e: Exception) {
+            errorMessage = "Error loading projects: ${e.message}"
+            isLoading = false
+        }
+    }
+
+    // Observe projects for real-time updates
+    LaunchedEffect(Unit) {
+        projectRepository.observeProjects().collect { projectsList ->
+            projects = projectsList
+            if (isLoading) {
+                isLoading = false
+            }
+        }
     }
 
     val filteredProjects = remember(projects, searchQuery) {
@@ -118,6 +106,41 @@ fun ProjectsListScreen(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        // Error message display
+        errorMessage?.let { error ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        onClick = { 
+                            errorMessage = null
+                            isLoading = true
+                            // Retry loading
+                        }
+                    ) {
+                        Text("Retry")
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         if (isLoading) {
             Box(

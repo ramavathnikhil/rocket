@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rapido.rocket.model.*
 import com.rapido.rocket.repository.FirebaseAuthRepository
+import com.rapido.rocket.repository.RepositoryProvider
 import com.rapido.rocket.util.currentTimeMillis
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,148 +30,41 @@ fun ReleaseDetailScreen(
     var workflowSteps by remember { mutableStateOf<List<WorkflowStep>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableStateOf(0) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // TODO: Load data from repositories
+    val releaseRepository = remember { RepositoryProvider.getReleaseRepository() }
+    val workflowRepository = remember { RepositoryProvider.getWorkflowRepository() }
+
+    // Load data from repositories
     LaunchedEffect(releaseId) {
-        // Simulate loading
-        kotlinx.coroutines.delay(1000)
-        
-        // Mock release data
-        release = Release(
-            id = releaseId,
-            projectId = "proj_1",
-            version = "v2.1.0",
-            title = "Enhanced Booking Experience",
-            description = "Improved UI for booking, better location search, bug fixes, and performance optimizations",
-            status = ReleaseStatus.IN_PROGRESS,
-            createdBy = "jane@company.com",
-            assignedTo = "mike@company.com",
-            targetReleaseDate = currentTimeMillis() + (7 * 24 * 60 * 60 * 1000L),
-            stagingBuildUrl = "https://github.com/company/releases/staging/v2.1.0",
-            githubReleaseUrl = "https://github.com/company/repo/releases/tag/v2.1.0",
-            notes = "This release includes major UI improvements and critical bug fixes"
-        )
-        
-        // Mock workflow steps
-        workflowSteps = listOf(
-            WorkflowStep(
-                id = "step_1",
-                releaseId = releaseId,
-                stepNumber = 1,
-                type = StepType.PR_MERGE,
-                title = "Merge Develop to Release",
-                description = "Create and merge PR from develop branch to release branch",
-                status = StepStatus.COMPLETED,
-                assignedTo = "dev@company.com",
-                completedBy = "dev@company.com",
-                notes = "PR #123 merged successfully",
-                actionUrl = "https://github.com/company/repo/pull/123",
-                estimatedDuration = 30,
-                actualDuration = 25
-            ),
-            WorkflowStep(
-                id = "step_2",
-                releaseId = releaseId,
-                stepNumber = 2,
-                type = StepType.BUILD_STAGING,
-                title = "Build Staging APK",
-                description = "Run GitHub Actions to build and share staging build",
-                status = StepStatus.COMPLETED,
-                assignedTo = "ci@company.com",
-                completedBy = "ci@company.com",
-                notes = "Build completed successfully. APK available for testing.",
-                actionUrl = "https://github.com/company/repo/actions/runs/12345",
-                estimatedDuration = 15,
-                actualDuration = 18
-            ),
-            WorkflowStep(
-                id = "step_3",
-                releaseId = releaseId,
-                stepNumber = 3,
-                type = StepType.STAGING_SIGNOFF,
-                title = "Staging Signoff",
-                description = "Get approval for staging build from stakeholders",
-                status = StepStatus.IN_PROGRESS,
-                assignedTo = "pm@company.com",
-                notes = "Waiting for PM and design team approval",
-                estimatedDuration = 120,
-                actualDuration = 0
-            ),
-            WorkflowStep(
-                id = "step_4",
-                releaseId = releaseId,
-                stepNumber = 4,
-                type = StepType.PR_TO_MASTER,
-                title = "Create PR to Master",
-                description = "Create PR from release branch to master branch",
-                status = StepStatus.PENDING,
-                assignedTo = "dev@company.com",
-                dependsOn = listOf("step_3"),
-                estimatedDuration = 15
-            ),
-            WorkflowStep(
-                id = "step_5",
-                releaseId = releaseId,
-                stepNumber = 5,
-                type = StepType.BUILD_PRODUCTION,
-                title = "Build Production APK",
-                description = "Build production regression build for QA testing",
-                status = StepStatus.PENDING,
-                assignedTo = "ci@company.com",
-                dependsOn = listOf("step_4"),
-                estimatedDuration = 20
-            ),
-            WorkflowStep(
-                id = "step_6",
-                releaseId = releaseId,
-                stepNumber = 6,
-                type = StepType.QA_SIGNOFF,
-                title = "QA Production Signoff",
-                description = "Get QA approval for production build",
-                status = StepStatus.PENDING,
-                assignedTo = "qa@company.com",
-                dependsOn = listOf("step_5"),
-                estimatedDuration = 240
-            ),
-            WorkflowStep(
-                id = "step_7",
-                releaseId = releaseId,
-                stepNumber = 7,
-                type = StepType.DEPLOY_BETA,
-                title = "Deploy to PlayStore Beta",
-                description = "Run GitHub Actions to deploy APK to PlayStore beta track",
-                status = StepStatus.PENDING,
-                assignedTo = "ops@company.com",
-                dependsOn = listOf("step_6"),
-                estimatedDuration = 30
-            ),
-            WorkflowStep(
-                id = "step_8",
-                releaseId = releaseId,
-                stepNumber = 8,
-                type = StepType.CREATE_GITHUB_RELEASE,
-                title = "Create GitHub Release",
-                description = "Create release tag and release notes in GitHub",
-                status = StepStatus.PENDING,
-                assignedTo = "dev@company.com",
-                dependsOn = listOf("step_7"),
-                estimatedDuration = 15
-            ),
-            WorkflowStep(
-                id = "step_9",
-                releaseId = releaseId,
-                stepNumber = 9,
-                type = StepType.PROMOTE_PRODUCTION,
-                title = "Promote to Production",
-                description = "Promote app from beta to production track in Play Console",
-                status = StepStatus.PENDING,
-                assignedTo = "ops@company.com",
-                dependsOn = listOf("step_8"),
-                estimatedDuration = 10
+        try {
+            // Load release
+            val releaseResult = releaseRepository.getRelease(releaseId)
+            releaseResult.fold(
+                onSuccess = { loadedRelease ->
+                    release = loadedRelease
+                },
+                onFailure = { error ->
+                    errorMessage = "Failed to load release: ${error.message}"
+                }
             )
-        )
-        
-        isLoading = false
+
+            // Load workflow steps for this release
+            val stepsResult = workflowRepository.getWorkflowStepsByRelease(releaseId)
+            stepsResult.fold(
+                onSuccess = { stepsList ->
+                    workflowSteps = stepsList
+                },
+                onFailure = { error ->
+                    errorMessage = "Failed to load workflow steps: ${error.message}"
+                }
+            )
+            
+            isLoading = false
+        } catch (e: Exception) {
+            errorMessage = "Error loading release data: ${e.message}"
+            isLoading = false
+        }
     }
 
     if (isLoading) {

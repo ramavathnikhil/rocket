@@ -26,6 +26,7 @@ import com.rapido.rocket.ui.screens.AdminUserManagementScreen
 import com.rapido.rocket.ui.screens.TestUserCreationScreen
 import com.rapido.rocket.ui.screens.ProjectDetailScreen
 import com.rapido.rocket.ui.screens.ReleaseDetailScreen
+import com.rapido.rocket.ui.screens.CreateReleaseScreen
 import com.rapido.rocket.ui.theme.RapidoRocketTheme
 import com.rapido.rocket.ui.theme.ThemeManager
 import com.rapido.rocket.ui.theme.rememberThemeManager
@@ -119,6 +120,7 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager:
     // New navigation states for project management
     var showProjectsList by remember { mutableStateOf(false) }
     var showCreateProject by remember { mutableStateOf(false) }
+    var showCreateRelease by remember { mutableStateOf(false) }
     var currentProjectId by remember { mutableStateOf<String?>(null) }
     var currentReleaseId by remember { mutableStateOf<String?>(null) }
     
@@ -228,6 +230,22 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager:
                             }
                         )
                     }
+                    isLoggedIn == true && showCreateRelease && currentProjectId != null -> {
+                        println("Rendering CreateReleaseScreen for project: $currentProjectId")
+                        CreateReleaseScreen(
+                            projectId = currentProjectId!!,
+                            authRepository = authRepository,
+                            onBack = {
+                                showCreateRelease = false
+                            },
+                            onReleaseCreated = { release ->
+                                println("Release created: ${release.title}")
+                                showCreateRelease = false
+                                // Navigate to the new release
+                                currentReleaseId = release.id
+                            }
+                        )
+                    }
                     isLoggedIn == true && currentProjectId != null -> {
                         println("Rendering ProjectDetailScreen for project: $currentProjectId")
                         ProjectDetailScreen(
@@ -238,8 +256,8 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager:
                                 showProjectsList = true
                             },
                             onCreateRelease = {
-                                // TODO: Navigate to create release screen
                                 println("Create release for project: $currentProjectId")
+                                showCreateRelease = true
                             },
                             onReleaseClick = { releaseId ->
                                 println("Navigate to release: $releaseId")
