@@ -4,4 +4,17 @@ html, body {
     margin: 0;
     padding: 0;
     overflow: hidden;
+    background-color: #FFFFFF; /* White background */
+    color: #000000; /* Black text */
+}
+
+/* Theme colors for web elements */
+:root {
+    --primary-color: #FFD700; /* Gold yellow */
+    --primary-variant: #FFC107; /* Amber yellow */
+    --background-color: #FFFFFF; /* White */
+    --surface-color: #FFFFFF; /* White */
+    --on-primary: #000000; /* Black on yellow */
+    --on-background: #000000; /* Black on white */
+    --on-surface: #000000; /* Black on white */
 }

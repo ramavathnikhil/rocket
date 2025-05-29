@@ -24,6 +24,7 @@ import com.rapido.rocket.ui.LoginPage
 import com.rapido.rocket.ui.screens.RegisterScreen
 import com.rapido.rocket.ui.screens.AdminUserManagementScreen
 import com.rapido.rocket.ui.screens.TestUserCreationScreen
+import com.rapido.rocket.ui.theme.RapidoRocketTheme
 import com.rapido.rocket.viewmodel.AuthViewModel
 
 @Composable
@@ -47,7 +48,7 @@ fun App() {
         }
     }
     
-    MaterialTheme {
+    RapidoRocketTheme {
         Surface(
             modifier = Modifier.fillMaxSize()
         ) {
