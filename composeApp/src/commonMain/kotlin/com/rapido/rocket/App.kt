@@ -25,12 +25,15 @@ import com.rapido.rocket.ui.screens.RegisterScreen
 import com.rapido.rocket.ui.screens.AdminUserManagementScreen
 import com.rapido.rocket.ui.screens.TestUserCreationScreen
 import com.rapido.rocket.ui.theme.RapidoRocketTheme
+import com.rapido.rocket.ui.theme.ThemeManager
+import com.rapido.rocket.ui.theme.rememberThemeManager
 import com.rapido.rocket.viewmodel.AuthViewModel
 
 @Composable
 fun App() {
     var initializationError by remember { mutableStateOf<String?>(null) }
     var authRepository by remember { mutableStateOf<FirebaseAuthRepository?>(null) }
+    val themeManager = rememberThemeManager()
     
     // Initialize Firebase and auth repository
     LaunchedEffect(Unit) {
@@ -48,7 +51,7 @@ fun App() {
         }
     }
     
-    RapidoRocketTheme {
+    RapidoRocketTheme(darkTheme = themeManager.isDarkTheme) {
         Surface(
             modifier = Modifier.fillMaxSize()
         ) {
@@ -96,7 +99,7 @@ fun App() {
                 }
                 else -> {
                     // Show main app
-                    MainAppContent(authRepository!!)
+                    MainAppContent(authRepository!!, themeManager)
                 }
             }
         }
@@ -104,7 +107,7 @@ fun App() {
 }
 
 @Composable
-private fun MainAppContent(authRepository: FirebaseAuthRepository) {
+private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager: ThemeManager) {
     val authViewModel = remember { AuthViewModel(authRepository) }
     var isLoggedIn by remember { mutableStateOf<Boolean?>(null) } // null = unknown, true = logged in, false = not logged in
     var showRegister by remember { mutableStateOf(false) }
@@ -220,6 +223,7 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository) {
                         println("Rendering HomePage")
                         HomePage(
                             authRepository = authRepository,
+                            themeManager = themeManager,
                             onLogout = {
                                 isLoggedIn = false
                             },
@@ -235,6 +239,7 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository) {
                         println("Rendering RegisterScreen")
                         RegisterScreen(
                             viewModel = authViewModel,
+                            themeManager = themeManager,
                             onNavigateToLogin = {
                                 showRegister = false
                             }
@@ -244,6 +249,7 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository) {
                         println("Rendering LoginPage")
                         LoginPage(
                             authRepository = authRepository,
+                            themeManager = themeManager,
                             onLoginSuccess = {
                                 println("Login success callback triggered")
                                 isLoggedIn = true

@@ -8,11 +8,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rapido.rocket.repository.FirebaseAuthRepository
+import com.rapido.rocket.ui.theme.ThemeManager
 import kotlinx.coroutines.launch
 
 @Composable
 fun LoginPage(
     authRepository: FirebaseAuthRepository,
+    themeManager: ThemeManager,
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit
 ) {
@@ -41,6 +43,27 @@ fun LoginPage(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
+        // Theme toggle button in top-right corner
+        IconButton(
+            onClick = { themeManager.toggleTheme() },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Text(
+                    text = if (themeManager.isDarkTheme) "Light" else "Dark",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+        
         Column(
             modifier = Modifier
                 .fillMaxWidth()
