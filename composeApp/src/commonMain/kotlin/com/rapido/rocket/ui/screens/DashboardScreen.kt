@@ -69,15 +69,67 @@ fun DashboardScreen(
         }
     }
 
-    Box(
+    Column(
         modifier = Modifier.fillMaxSize()
     ) {
+        // Header with Home button (left), Theme toggle (center-right), and Logout (right)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Home button (left)
+            TextButton(
+                onClick = { /* Already on home, so do nothing or refresh */ }
+            ) {
+                Text(
+                    text = "Home",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
+            
+            // Theme toggle and Logout (right side)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Theme toggle switch
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = if (themeManager.isDarkTheme) "🌙" else "☀️",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Switch(
+                        checked = themeManager.isDarkTheme,
+                        onCheckedChange = { themeManager.toggleTheme() }
+                    )
+                }
+                
+                // Logout button
+                Button(
+                    onClick = onLogout,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                ) {
+                    Text("Logout")
+                }
+            }
+        }
+
         // Error message display
         errorMessage?.let { error ->
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 16.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer
                 )
@@ -105,55 +157,13 @@ fun DashboardScreen(
                     }
                 }
             }
-        }
-
-        // Theme toggle button in top-right corner
-        IconButton(
-            onClick = { themeManager.toggleTheme() },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-        ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.padding(8.dp)
-            ) {
-                Text(
-                    text = if (themeManager.isDarkTheme) "Light" else "Dark",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-        }
-
-        // Logout button in top-left corner
-        IconButton(
-            onClick = onLogout,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-        ) {
-            Surface(
-                color = MaterialTheme.colorScheme.errorContainer,
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.padding(8.dp)
-            ) {
-                Text(
-                    text = "Logout",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
-                .padding(top = 48.dp) // Account for top buttons
+                .padding(horizontal = 16.dp)
         ) {
             // Header
             Text(
@@ -285,7 +295,10 @@ private fun ProjectsOverviewCard(
                 )
 
                 TextButton(onClick = onViewAll) {
-                    Text("View All")
+                    Text(
+                        text = "View All",
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
 
@@ -333,7 +346,10 @@ private fun ProjectItem(
             }
 
             TextButton(onClick = onClick) {
-                Text("View")
+                Text(
+                    text = "View",
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }
@@ -403,7 +419,10 @@ private fun ReleaseItem(
         }
 
         TextButton(onClick = onClick) {
-            Text("View")
+            Text(
+                text = "View",
+                color = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }

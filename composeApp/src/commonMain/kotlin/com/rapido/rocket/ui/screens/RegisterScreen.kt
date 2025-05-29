@@ -24,25 +24,22 @@ fun RegisterScreen(
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Theme toggle button in top-right corner
-        IconButton(
-            onClick = { themeManager.toggleTheme() },
+        // Theme toggle in top-right corner
+        Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.padding(8.dp)
-            ) {
-                Text(
-                    text = if (themeManager.isDarkTheme) "Light" else "Dark",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
+            Text(
+                text = if (themeManager.isDarkTheme) "🌙" else "☀️",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Switch(
+                checked = themeManager.isDarkTheme,
+                onCheckedChange = { themeManager.toggleTheme() }
+            )
         }
         
         Column(
