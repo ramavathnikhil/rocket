@@ -19,7 +19,32 @@ enum class StepType {
     CREATE_GITHUB_RELEASE,
     PROMOTE_PRODUCTION,
     MANUAL_TASK,
-    GITHUB_ACTION
+    GITHUB_ACTION,
+    UPDATE_VERSION,
+    CREATE_PR_BFF,
+    SHARE_FUNCTIONAL_BUILD,
+    FUNCTIONAL_SIGNOFF,
+    SHARE_REGRESSION_BUILD,
+    REGRESSION_SIGNOFF,
+    CREATE_BASELINE_PROFILE_PR,
+    CREATE_PROD_CONFIGS,
+    DEPLOY_PROD_CONFIGS,
+    DEPLOY_BFF_PROD,
+    SHARE_PROD_REGRESSION_BUILD,
+    WRITE_BFF_RELEASE_NOTES,
+    CREATE_BFF_RELEASE_TAG,
+    BACK_MERGE_BFF,
+    PROMOTE_BETA_100_PERCENT,
+    PUBLISH_BETA_99_PERCENT,
+    CREATE_APP_RELEASE_TAG,
+    BACK_MERGE_APP,
+    MONITOR_CRASHES,
+    PRODUCTION_100_PERCENT,
+    DEPLOY_PRODUCTION_5_PERCENT,
+    PROMOTE_30_PERCENT,
+    PROMOTE_50_PERCENT,
+    PROMOTE_75_PERCENT,
+    PROMOTE_99_PERCENT
 }
 
 data class WorkflowStep(
@@ -101,85 +126,244 @@ data class WorkflowStep(
 
         fun getDefaultWorkflowSteps(): List<WorkflowStep> {
             return listOf(
+                // Stage 1: Functional testing stage
                 WorkflowStep(
                     stepNumber = 1,
-                    type = StepType.PR_MERGE,
-                    title = "Merge Develop to Release",
-                    description = "Create and merge PR from develop branch to release branch",
+                    type = StepType.UPDATE_VERSION,
+                    title = "Update App and BFF Version",
+                    description = "Update version numbers in both App and BFF repositories",
                     isRequired = true,
-                    estimatedDuration = 30
+                    estimatedDuration = 15
                 ),
                 WorkflowStep(
                     stepNumber = 2,
-                    type = StepType.BUILD_STAGING,
-                    title = "Build Staging APK",
-                    description = "Run GitHub Actions to build and share staging build",
+                    type = StepType.PR_MERGE,
+                    title = "Create App PR from develop to release",
+                    description = "Create and merge PR from develop branch to release branch for App",
                     isRequired = true,
-                    dependsOn = listOf(), // Will be filled with step 1 ID
-                    estimatedDuration = 15
-                ),
-                WorkflowStep(
-                    stepNumber = 3,
-                    type = StepType.STAGING_SIGNOFF,
-                    title = "Staging Signoff",
-                    description = "Get approval for staging build from stakeholders",
-                    isRequired = true,
-                    dependsOn = listOf(), // Will be filled with step 2 ID
-                    estimatedDuration = 120
-                ),
-                WorkflowStep(
-                    stepNumber = 4,
-                    type = StepType.PR_TO_MASTER,
-                    title = "Create PR to Master",
-                    description = "Create PR from release branch to master branch",
-                    isRequired = true,
-                    dependsOn = listOf(), // Will be filled with step 3 ID
-                    estimatedDuration = 15
-                ),
-                WorkflowStep(
-                    stepNumber = 5,
-                    type = StepType.BUILD_PRODUCTION,
-                    title = "Build Production APK",
-                    description = "Build production regression build for QA testing",
-                    isRequired = true,
-                    dependsOn = listOf(), // Will be filled with step 4 ID
-                    estimatedDuration = 20
-                ),
-                WorkflowStep(
-                    stepNumber = 6,
-                    type = StepType.QA_SIGNOFF,
-                    title = "QA Production Signoff",
-                    description = "Get QA approval for production build",
-                    isRequired = true,
-                    dependsOn = listOf(), // Will be filled with step 5 ID
-                    estimatedDuration = 240
-                ),
-                WorkflowStep(
-                    stepNumber = 7,
-                    type = StepType.DEPLOY_BETA,
-                    title = "Deploy to PlayStore Beta",
-                    description = "Run GitHub Actions to deploy APK to PlayStore beta track",
-                    isRequired = true,
-                    dependsOn = listOf(), // Will be filled with step 6 ID
                     estimatedDuration = 30
                 ),
                 WorkflowStep(
-                    stepNumber = 8,
-                    type = StepType.CREATE_GITHUB_RELEASE,
-                    title = "Create GitHub Release",
-                    description = "Create release tag and release notes in GitHub",
+                    stepNumber = 3,
+                    type = StepType.CREATE_PR_BFF,
+                    title = "Create BFF PR from develop to release",
+                    description = "Create and merge PR from develop branch to release branch for BFF",
                     isRequired = true,
-                    dependsOn = listOf(), // Will be filled with step 7 ID
-                    estimatedDuration = 15
+                    estimatedDuration = 30
+                ),
+                WorkflowStep(
+                    stepNumber = 4,
+                    type = StepType.SHARE_FUNCTIONAL_BUILD,
+                    title = "Share functional build (Staging Minified debug build)",
+                    description = "Share functional build from release branch once develop to release is merged",
+                    isRequired = true,
+                    estimatedDuration = 45
+                ),
+                WorkflowStep(
+                    stepNumber = 5,
+                    type = StepType.FUNCTIONAL_SIGNOFF,
+                    title = "Wait for functional signoff",
+                    description = "Wait for functional testing approval from stakeholders",
+                    isRequired = true,
+                    estimatedDuration = 480
+                ),
+                
+                // Stage 2: Regression stage
+                WorkflowStep(
+                    stepNumber = 6,
+                    type = StepType.SHARE_REGRESSION_BUILD,
+                    title = "Share regression build (Staging Release build)",
+                    description = "After functional signoff, share regression build from release branch",
+                    isRequired = true,
+                    estimatedDuration = 30
+                ),
+                WorkflowStep(
+                    stepNumber = 7,
+                    type = StepType.REGRESSION_SIGNOFF,
+                    title = "Wait for Regression signoff",
+                    description = "Wait for regression testing approval from QA team",
+                    isRequired = true,
+                    estimatedDuration = 720
+                ),
+                
+                // Stage 3: Prod Regression stage
+                WorkflowStep(
+                    stepNumber = 8,
+                    type = StepType.CREATE_BASELINE_PROFILE_PR,
+                    title = "Create baseline profile PR to release branch",
+                    description = "Create and raise baseline profile PR to release branch of APP",
+                    isRequired = true,
+                    estimatedDuration = 45
                 ),
                 WorkflowStep(
                     stepNumber = 9,
-                    type = StepType.PROMOTE_PRODUCTION,
-                    title = "Promote to Production",
-                    description = "Promote app from beta to production track in Play Console",
+                    type = StepType.PR_TO_MASTER,
+                    title = "Create App PR from release to master",
+                    description = "Create App PR from release branch to master branch",
                     isRequired = true,
-                    dependsOn = listOf(), // Will be filled with step 8 ID
-                    estimatedDuration = 10
+                    estimatedDuration = 20
+                ),
+                WorkflowStep(
+                    stepNumber = 10,
+                    type = StepType.CREATE_PR_BFF,
+                    title = "Create BFF PR from release to master",
+                    description = "Create BFF PR from release branch to master branch",
+                    isRequired = true,
+                    estimatedDuration = 20
+                ),
+                WorkflowStep(
+                    stepNumber = 11,
+                    type = StepType.CREATE_PROD_CONFIGS,
+                    title = "Create prod configs for App and BFF",
+                    description = "Create production configuration files for both App and BFF",
+                    isRequired = true,
+                    estimatedDuration = 60
+                ),
+                WorkflowStep(
+                    stepNumber = 12,
+                    type = StepType.DEPLOY_PROD_CONFIGS,
+                    title = "Deploy BFF and APP prod configs",
+                    description = "Deploy production configurations for both BFF and APP",
+                    isRequired = true,
+                    estimatedDuration = 30
+                ),
+                WorkflowStep(
+                    stepNumber = 13,
+                    type = StepType.DEPLOY_BFF_PROD,
+                    title = "Deploy BFF to production",
+                    description = "Once BFF PR is merged, get it deployed to production",
+                    isRequired = true,
+                    estimatedDuration = 45
+                ),
+                WorkflowStep(
+                    stepNumber = 14,
+                    type = StepType.SHARE_PROD_REGRESSION_BUILD,
+                    title = "Share Prod regression build from master",
+                    description = "Once BFF is deployed, share Production regression build from master branch",
+                    isRequired = true,
+                    estimatedDuration = 30
+                ),
+                WorkflowStep(
+                    stepNumber = 15,
+                    type = StepType.WRITE_BFF_RELEASE_NOTES,
+                    title = "Write BFF deployment release notes",
+                    description = "Document BFF deployment changes and release notes",
+                    isRequired = true,
+                    estimatedDuration = 30
+                ),
+                WorkflowStep(
+                    stepNumber = 16,
+                    type = StepType.CREATE_BFF_RELEASE_TAG,
+                    title = "Create release tag for BFF repo",
+                    description = "Create and push release tag in BFF repository",
+                    isRequired = true,
+                    estimatedDuration = 15
+                ),
+                WorkflowStep(
+                    stepNumber = 17,
+                    type = StepType.BACK_MERGE_BFF,
+                    title = "Back merge from release to develop (BFF)",
+                    description = "Back merge changes from release to develop branch in BFF repo",
+                    isRequired = true,
+                    estimatedDuration = 20
+                ),
+                
+                // Stage 4: Deployment to Production
+                WorkflowStep(
+                    stepNumber = 18,
+                    type = StepType.PROMOTE_BETA_100_PERCENT,
+                    title = "Promote previous app to 100% in beta track",
+                    description = "Promote the previous app version to 100% users in beta track",
+                    isRequired = true,
+                    estimatedDuration = 15
+                ),
+                WorkflowStep(
+                    stepNumber = 19,
+                    type = StepType.QA_SIGNOFF,
+                    title = "Wait for production signoff",
+                    description = "Wait for final production deployment approval",
+                    isRequired = true,
+                    estimatedDuration = 240
+                ),
+                WorkflowStep(
+                    stepNumber = 20,
+                    type = StepType.PUBLISH_BETA_99_PERCENT,
+                    title = "Publish to beta track 99.9999%",
+                    description = "Once production signoff received, publish build to beta track for 99.9999% users",
+                    isRequired = true,
+                    estimatedDuration = 20
+                ),
+                WorkflowStep(
+                    stepNumber = 21,
+                    type = StepType.CREATE_APP_RELEASE_TAG,
+                    title = "Create release tag for app repo",
+                    description = "Create and push release tag in app repository",
+                    isRequired = true,
+                    estimatedDuration = 15
+                ),
+                WorkflowStep(
+                    stepNumber = 22,
+                    type = StepType.BACK_MERGE_APP,
+                    title = "Back merge from release to develop (App)",
+                    description = "Back merge changes from release to develop branch in App repo",
+                    isRequired = true,
+                    estimatedDuration = 20
+                ),
+                WorkflowStep(
+                    stepNumber = 23,
+                    type = StepType.MONITOR_CRASHES,
+                    title = "Monitor for crashes or issues",
+                    description = "Monitor application for any crashes or critical issues",
+                    isRequired = true,
+                    estimatedDuration = 120
+                ),
+                WorkflowStep(
+                    stepNumber = 24,
+                    type = StepType.PRODUCTION_100_PERCENT,
+                    title = "Make previous production build to 100% users",
+                    description = "Promote previous production build to 100% of users",
+                    isRequired = true,
+                    estimatedDuration = 15
+                ),
+                WorkflowStep(
+                    stepNumber = 25,
+                    type = StepType.DEPLOY_PRODUCTION_5_PERCENT,
+                    title = "Move build from beta to production track (5%)",
+                    description = "If no issues observed, move the build from beta to production track for 5% users",
+                    isRequired = true,
+                    estimatedDuration = 20
+                ),
+                WorkflowStep(
+                    stepNumber = 26,
+                    type = StepType.PROMOTE_30_PERCENT,
+                    title = "Promote to 30% users",
+                    description = "If no issues observed, promote the app to 30% users",
+                    isRequired = true,
+                    estimatedDuration = 15
+                ),
+                WorkflowStep(
+                    stepNumber = 27,
+                    type = StepType.PROMOTE_50_PERCENT,
+                    title = "Promote to 50% users",
+                    description = "If no issues observed, promote the app to 50% users",
+                    isRequired = true,
+                    estimatedDuration = 15
+                ),
+                WorkflowStep(
+                    stepNumber = 28,
+                    type = StepType.PROMOTE_75_PERCENT,
+                    title = "Promote to 75% users",
+                    description = "If no issues observed, promote the app to 75% users",
+                    isRequired = true,
+                    estimatedDuration = 15
+                ),
+                WorkflowStep(
+                    stepNumber = 29,
+                    type = StepType.PROMOTE_99_PERCENT,
+                    title = "Promote to 99.99999% users",
+                    description = "If no issues observed, promote the app to 99.99999% users",
+                    isRequired = true,
+                    estimatedDuration = 15
                 )
             )
         }

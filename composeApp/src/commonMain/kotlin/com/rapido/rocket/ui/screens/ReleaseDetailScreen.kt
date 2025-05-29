@@ -402,6 +402,14 @@ private fun WorkflowOverviewCard(
     val failedSteps = steps.count { it.status == StepStatus.FAILED }
     val progress = if (totalSteps > 0) completedSteps.toFloat() / totalSteps else 0f
     
+    // Define stage ranges
+    val stages = listOf(
+        "Functional Testing" to (1..5),
+        "Regression Testing" to (6..7), 
+        "Prod Regression" to (8..17),
+        "Production Deployment" to (18..29)
+    )
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -449,7 +457,7 @@ private fun WorkflowOverviewCard(
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Progress bar
+            // Overall progress bar
             Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -475,6 +483,57 @@ private fun WorkflowOverviewCard(
                         .height(8.dp),
                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Stage progress
+            Text(
+                text = "Stage Progress",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            stages.forEach { (stageName, stageRange) ->
+                val stageSteps = steps.filter { it.stepNumber in stageRange }
+                val stageCompleted = stageSteps.count { it.status == StepStatus.COMPLETED }
+                val stageTotal = stageSteps.size
+                val stageProgress = if (stageTotal > 0) stageCompleted.toFloat() / stageTotal else 0f
+                val stageInProgress = stageSteps.any { it.status == StepStatus.IN_PROGRESS }
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Stage status indicator
+                    Surface(
+                        color = when {
+                            stageProgress == 1f -> Color.Green
+                            stageInProgress -> MaterialTheme.colorScheme.primary
+                            stageProgress > 0f -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.size(12.dp)
+                    ) {}
+                    
+                    Text(
+                        text = stageName,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    Text(
+                        text = "$stageCompleted/$stageTotal",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(4.dp))
             }
             
             Spacer(modifier = Modifier.height(12.dp))
@@ -916,6 +975,33 @@ private fun getStepTypeDisplayName(type: StepType): String {
         StepType.PROMOTE_PRODUCTION -> "Deployment"
         StepType.MANUAL_TASK -> "Manual Task"
         StepType.GITHUB_ACTION -> "Automation"
+        
+        // New step types for detailed workflow
+        StepType.UPDATE_VERSION -> "Version Management"
+        StepType.CREATE_PR_BFF -> "Pull Request"
+        StepType.SHARE_FUNCTIONAL_BUILD -> "Build & Deploy"
+        StepType.FUNCTIONAL_SIGNOFF -> "Approval"
+        StepType.SHARE_REGRESSION_BUILD -> "Build & Deploy"
+        StepType.REGRESSION_SIGNOFF -> "Quality Assurance"
+        StepType.CREATE_BASELINE_PROFILE_PR -> "Pull Request"
+        StepType.CREATE_PROD_CONFIGS -> "Configuration"
+        StepType.DEPLOY_PROD_CONFIGS -> "Deployment"
+        StepType.DEPLOY_BFF_PROD -> "Deployment"
+        StepType.SHARE_PROD_REGRESSION_BUILD -> "Build & Deploy"
+        StepType.WRITE_BFF_RELEASE_NOTES -> "Documentation"
+        StepType.CREATE_BFF_RELEASE_TAG -> "Release Management"
+        StepType.BACK_MERGE_BFF -> "Pull Request"
+        StepType.PROMOTE_BETA_100_PERCENT -> "Deployment"
+        StepType.PUBLISH_BETA_99_PERCENT -> "Deployment"
+        StepType.CREATE_APP_RELEASE_TAG -> "Release Management"
+        StepType.BACK_MERGE_APP -> "Pull Request"
+        StepType.MONITOR_CRASHES -> "Monitoring"
+        StepType.PRODUCTION_100_PERCENT -> "Deployment"
+        StepType.DEPLOY_PRODUCTION_5_PERCENT -> "Deployment"
+        StepType.PROMOTE_30_PERCENT -> "Deployment"
+        StepType.PROMOTE_50_PERCENT -> "Deployment"
+        StepType.PROMOTE_75_PERCENT -> "Deployment"
+        StepType.PROMOTE_99_PERCENT -> "Deployment"
     }
 }
 

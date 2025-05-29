@@ -248,88 +248,17 @@ class WasmFirebaseWorkflowRepository : WorkflowRepository {
     
     override suspend fun createDefaultWorkflowSteps(releaseId: String): Result<List<WorkflowStep>> {
         return try {
-            val defaultSteps = listOf(
-                WorkflowStep(
-                    id = "",
+            // Get the default workflow steps from the model
+            val defaultStepTemplates = WorkflowStep.getDefaultWorkflowSteps()
+            
+            // Apply the release ID to each step
+            val defaultSteps = defaultStepTemplates.map { template ->
+                template.copy(
                     releaseId = releaseId,
-                    stepNumber = 1,
-                    type = StepType.PR_MERGE,
-                    title = "Merge Develop to Release",
-                    description = "Create and merge PR from develop branch to release branch",
-                    status = StepStatus.PENDING,
-                    assignedTo = "",
-                    completedBy = "",
                     createdAt = currentTimeMillis(),
-                    updatedAt = currentTimeMillis(),
-                    completedAt = null,
-                    notes = "",
-                    actionUrl = "",
-                    isRequired = true,
-                    dependsOn = emptyList(),
-                    estimatedDuration = 30,
-                    actualDuration = 0
-                ),
-                WorkflowStep(
-                    id = "",
-                    releaseId = releaseId,
-                    stepNumber = 2,
-                    type = StepType.BUILD_STAGING,
-                    title = "Build Staging APK",
-                    description = "Run GitHub Actions to build and share staging build",
-                    status = StepStatus.PENDING,
-                    assignedTo = "",
-                    completedBy = "",
-                    createdAt = currentTimeMillis(),
-                    updatedAt = currentTimeMillis(),
-                    completedAt = null,
-                    notes = "",
-                    actionUrl = "",
-                    isRequired = true,
-                    dependsOn = emptyList(),
-                    estimatedDuration = 15,
-                    actualDuration = 0
-                ),
-                WorkflowStep(
-                    id = "",
-                    releaseId = releaseId,
-                    stepNumber = 3,
-                    type = StepType.STAGING_SIGNOFF,
-                    title = "Staging Signoff",
-                    description = "Get approval for staging build from stakeholders",
-                    status = StepStatus.PENDING,
-                    assignedTo = "",
-                    completedBy = "",
-                    createdAt = currentTimeMillis(),
-                    updatedAt = currentTimeMillis(),
-                    completedAt = null,
-                    notes = "",
-                    actionUrl = "",
-                    isRequired = true,
-                    dependsOn = emptyList(),
-                    estimatedDuration = 120,
-                    actualDuration = 0
-                ),
-                WorkflowStep(
-                    id = "",
-                    releaseId = releaseId,
-                    stepNumber = 4,
-                    type = StepType.DEPLOY_BETA,
-                    title = "Deploy to PlayStore Beta",
-                    description = "Deploy APK to PlayStore beta track",
-                    status = StepStatus.PENDING,
-                    assignedTo = "",
-                    completedBy = "",
-                    createdAt = currentTimeMillis(),
-                    updatedAt = currentTimeMillis(),
-                    completedAt = null,
-                    notes = "",
-                    actionUrl = "",
-                    isRequired = true,
-                    dependsOn = emptyList(),
-                    estimatedDuration = 30,
-                    actualDuration = 0
+                    updatedAt = currentTimeMillis()
                 )
-            )
+            }
             
             val createdSteps = mutableListOf<WorkflowStep>()
             for (step in defaultSteps) {
