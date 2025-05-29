@@ -15,13 +15,20 @@ expect class LocalStorageManager {
 class ThemeManager(private val localStorage: LocalStorageManager) {
     private val THEME_KEY = "app_theme_dark"
     
-    var isDarkTheme by mutableStateOf(false)
+    var isDarkTheme by mutableStateOf(true)
         private set
 
     init {
         // Load saved theme preference
         val savedTheme = localStorage.getItem(THEME_KEY)
-        isDarkTheme = savedTheme == "true"
+        // If user has explicitly saved a preference, use it
+        // Otherwise, default to dark theme
+        isDarkTheme = when (savedTheme) {
+            "false" -> false  // User explicitly chose light theme
+            "true" -> true    // User explicitly chose dark theme  
+            null -> true      // No preference saved, default to dark
+            else -> true      // Fallback to dark theme
+        }
     }
 
     fun toggleTheme() {
