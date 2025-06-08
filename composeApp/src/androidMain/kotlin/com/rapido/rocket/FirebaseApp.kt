@@ -9,7 +9,7 @@ actual object FirebaseApp {
             com.google.firebase.FirebaseApp.initializeApp(
                 android.app.Application.getApplicationContext(),
                 FirebaseOptions.Builder()
-                    .setProjectId("rideon-edd12")
+                    .setProjectId("rapido-captain-test")
                     .setApplicationId("1:468013252606:android:47e9fd55e214c0e4888aaf")
                     .setApiKey("AIzaSyCSjWuJ5iHWfmyQKgHRDuVhg1-VZ05qcIg")
                     .setStorageBucket("rapido-captain-test.firebasestorage.app")

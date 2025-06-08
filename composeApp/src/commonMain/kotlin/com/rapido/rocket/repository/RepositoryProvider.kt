@@ -5,4 +5,5 @@ expect object RepositoryProvider {
     fun getReleaseRepository(): ReleaseRepository
     fun getWorkflowRepository(): WorkflowRepository
     fun getAuthRepository(): FirebaseAuthRepository
+    fun getGitHubRepository(): GitHubRepository
 } 

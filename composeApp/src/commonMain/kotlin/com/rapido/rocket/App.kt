@@ -121,6 +121,7 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager:
     var showProjectsList by remember { mutableStateOf(false) }
     var showCreateProject by remember { mutableStateOf(false) }
     var showCreateRelease by remember { mutableStateOf(false) }
+    var showGitHubConfig by remember { mutableStateOf(false) }
     var currentProjectId by remember { mutableStateOf<String?>(null) }
     var currentReleaseId by remember { mutableStateOf<String?>(null) }
     
@@ -219,20 +220,16 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager:
                             authRepository = authRepository,
                             onBack = {
                                 currentReleaseId = null
-                                // Go back to project detail if we have a project
-                                if (currentProjectId == null) {
-                                    showProjectsList = true
-                                }
                             },
                             onEditRelease = {
-                                // TODO: Navigate to edit release screen
+                                // TODO: Implement edit release functionality
                                 println("Edit release: $currentReleaseId")
                             }
                         )
                     }
                     isLoggedIn == true && showCreateRelease && currentProjectId != null -> {
                         println("Rendering CreateReleaseScreen for project: $currentProjectId")
-                        CreateReleaseScreen(
+                        com.rapido.rocket.ui.screens.CreateReleaseScreen(
                             projectId = currentProjectId!!,
                             authRepository = authRepository,
                             onBack = {
@@ -243,6 +240,20 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager:
                                 showCreateRelease = false
                                 // Navigate to the new release
                                 currentReleaseId = release.id
+                            }
+                        )
+                    }
+                    isLoggedIn == true && showGitHubConfig && currentProjectId != null -> {
+                        println("Rendering GitHubConfigScreen for project: $currentProjectId")
+                        com.rapido.rocket.ui.screens.GitHubConfigScreen(
+                            projectId = currentProjectId!!,
+                            authRepository = authRepository,
+                            onBack = {
+                                showGitHubConfig = false
+                            },
+                            onConfigSaved = {
+                                println("GitHub config saved for project: $currentProjectId")
+                                showGitHubConfig = false
                             }
                         )
                     }
@@ -262,6 +273,10 @@ private fun MainAppContent(authRepository: FirebaseAuthRepository, themeManager:
                             onReleaseClick = { releaseId ->
                                 println("Navigate to release: $releaseId")
                                 currentReleaseId = releaseId
+                            },
+                            onGitHubConfig = {
+                                println("Navigate to GitHub config for project: $currentProjectId")
+                                showGitHubConfig = true
                             }
                         )
                     }

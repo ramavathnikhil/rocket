@@ -16,4 +16,8 @@ actual object RepositoryProvider {
     actual fun getAuthRepository(): FirebaseAuthRepository {
         return WasmFirebaseAuthRepository()
     }
+    
+    actual fun getGitHubRepository(): GitHubRepository {
+        return WasmGitHubRepository()
+    }
 } 

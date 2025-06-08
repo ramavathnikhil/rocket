@@ -24,7 +24,8 @@ fun ProjectDetailScreen(
     authRepository: FirebaseAuthRepository,
     onBack: () -> Unit,
     onCreateRelease: () -> Unit,
-    onReleaseClick: (String) -> Unit
+    onReleaseClick: (String) -> Unit,
+    onGitHubConfig: () -> Unit = {}
 ) {
     var project by remember { mutableStateOf<Project?>(null) }
     var releases by remember { mutableStateOf<List<Release>>(emptyList()) }
@@ -157,7 +158,7 @@ fun ProjectDetailScreen(
                     workflowSteps = workflowSteps,
                     onReleaseClick = onReleaseClick
                 )
-                1 -> ProjectInfoContent(project = proj)
+                1 -> ProjectInfoContent(project = proj, onGitHubConfig = onGitHubConfig)
             }
         }
     }
@@ -374,7 +375,7 @@ private fun WorkflowProgressBar(steps: List<WorkflowStep>) {
 }
 
 @Composable
-private fun ProjectInfoContent(project: Project) {
+private fun ProjectInfoContent(project: Project, onGitHubConfig: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -387,6 +388,25 @@ private fun ProjectInfoContent(project: Project) {
             InfoRow(label = "Description", value = project.description)
             InfoRow(label = "Created by", value = project.createdBy)
             InfoRow(label = "Status", value = if (project.isActive) "Active" else "Inactive")
+        }
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // GitHub Integration
+        InfoSection(title = "GitHub Integration") {
+            Text(
+                text = "Configure GitHub repositories for automatic PR creation during releases",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+            
+            Button(
+                onClick = onGitHubConfig,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Configure GitHub")
+            }
         }
         
         Spacer(modifier = Modifier.height(24.dp))

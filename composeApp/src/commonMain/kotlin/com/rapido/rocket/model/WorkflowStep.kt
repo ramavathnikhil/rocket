@@ -65,7 +65,14 @@ data class WorkflowStep(
     val isRequired: Boolean = true,
     val dependsOn: List<String> = emptyList(), // IDs of steps this depends on
     val estimatedDuration: Int = 0, // in minutes
-    val actualDuration: Int = 0 // in minutes
+    val actualDuration: Int = 0, // in minutes
+    // GitHub integration fields
+    val githubPrNumber: Int? = null, // GitHub PR number if created
+    val githubPrUrl: String = "", // GitHub PR URL if created
+    val githubPrState: String = "", // "open", "closed", "merged"
+    val repositoryType: String = "", // "app" or "bff" for GitHub steps
+    val sourceBranch: String = "", // Source branch for PRs
+    val targetBranch: String = "" // Target branch for PRs
 ) {
     fun toMap(): Map<String, Any> {
         return mapOf(
@@ -86,7 +93,13 @@ data class WorkflowStep(
             "isRequired" to isRequired,
             "dependsOn" to dependsOn,
             "estimatedDuration" to estimatedDuration,
-            "actualDuration" to actualDuration
+            "actualDuration" to actualDuration,
+            "githubPrNumber" to (githubPrNumber ?: ""),
+            "githubPrUrl" to githubPrUrl,
+            "githubPrState" to githubPrState,
+            "repositoryType" to repositoryType,
+            "sourceBranch" to sourceBranch,
+            "targetBranch" to targetBranch
         )
     }
 
@@ -120,7 +133,15 @@ data class WorkflowStep(
                 isRequired = map["isRequired"] as? Boolean ?: true,
                 dependsOn = (map["dependsOn"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                 estimatedDuration = map["estimatedDuration"] as? Int ?: 0,
-                actualDuration = map["actualDuration"] as? Int ?: 0
+                actualDuration = map["actualDuration"] as? Int ?: 0,
+                githubPrNumber = map["githubPrNumber"].let { 
+                    if (it is Int) it else null 
+                },
+                githubPrUrl = map["githubPrUrl"] as? String ?: "",
+                githubPrState = map["githubPrState"] as? String ?: "",
+                repositoryType = map["repositoryType"] as? String ?: "",
+                sourceBranch = map["sourceBranch"] as? String ?: "",
+                targetBranch = map["targetBranch"] as? String ?: ""
             )
         }
 
@@ -141,7 +162,10 @@ data class WorkflowStep(
                     title = "Create App PR from develop to release",
                     description = "Create and merge PR from develop branch to release branch for App",
                     isRequired = true,
-                    estimatedDuration = 30
+                    estimatedDuration = 30,
+                    repositoryType = "app",
+                    sourceBranch = "develop",
+                    targetBranch = "release"
                 ),
                 WorkflowStep(
                     stepNumber = 3,
@@ -149,7 +173,10 @@ data class WorkflowStep(
                     title = "Create BFF PR from develop to release",
                     description = "Create and merge PR from develop branch to release branch for BFF",
                     isRequired = true,
-                    estimatedDuration = 30
+                    estimatedDuration = 30,
+                    repositoryType = "bff",
+                    sourceBranch = "develop",
+                    targetBranch = "release"
                 ),
                 WorkflowStep(
                     stepNumber = 4,
@@ -201,7 +228,10 @@ data class WorkflowStep(
                     title = "Create App PR from release to master",
                     description = "Create App PR from release branch to master branch",
                     isRequired = true,
-                    estimatedDuration = 20
+                    estimatedDuration = 20,
+                    repositoryType = "app",
+                    sourceBranch = "release",
+                    targetBranch = "master"
                 ),
                 WorkflowStep(
                     stepNumber = 10,
@@ -209,7 +239,10 @@ data class WorkflowStep(
                     title = "Create BFF PR from release to master",
                     description = "Create BFF PR from release branch to master branch",
                     isRequired = true,
-                    estimatedDuration = 20
+                    estimatedDuration = 20,
+                    repositoryType = "bff",
+                    sourceBranch = "release",
+                    targetBranch = "master"
                 ),
                 WorkflowStep(
                     stepNumber = 11,
