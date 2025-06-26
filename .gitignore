@@ -1,18 +1,99 @@
+# IDE Files
 *.iml
-.kotlin
-.gradle
-**/build/
-xcuserdata
-!src/**/build/
-local.properties
-.idea
+.idea/
+.vscode/
+
+# OS Files
 .DS_Store
-captures
-.externalNativeBuild
-.cxx
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Gradle Files
+.gradle/
+**/build/
+!src/**/build/
+gradle-app.setting
+local.properties
+
+# Kotlin/JS Files
+.kotlin/
+kotlin-js-store/
+*.js.map
+
+# Node.js Files
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+*.tgz
+*.tar.gz
+
+# Firebase Files
+.firebase/
+.firebaserc.local
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Build Artifacts
+dist/
+out/
+*.wasm
+*.js
+*.html
+!composeApp/src/wasmJsMain/resources/index.html
+!composeApp/src/wasmJsMain/resources/composeApp.js
+!public/index.html
+!functions/index.js
+
+# Logs
+*.log
+logs/
+*.tmp
+*.cache
+*.temp
+
+# iOS Files
+xcuserdata/
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata/
 !*.xcodeproj/project.xcworkspace/
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Android Files
+*.apk
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+proguard/
+
+# Test Files
+coverage/
+.nyc_output/
+
+# Temporary Files
+*.swp
+*.swo
+*~
+*.backup
+*.bak
+
+# GitHub Functions Directory (temporary project setup)
+github-functions/
+
+# Runtime Files
+*.pid
+*.seed
+*.pid.lock

@@ -88,6 +88,17 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
+        
+        val wasmJsMain by getting {
+            dependencies {
+                implementation("io.ktor:ktor-client-core:3.0.0-wasm2")
+                implementation("io.ktor:ktor-client-content-negotiation:3.0.0-wasm2")
+                implementation("io.ktor:ktor-client-logging:3.0.0-wasm2")
+                implementation("io.ktor:ktor-client-serialization:3.0.0-wasm2")
+                implementation("io.ktor:ktor-client-json:3.0.0-wasm2")
+                implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.0-wasm2")
+            }
+        }
     }
 }
 

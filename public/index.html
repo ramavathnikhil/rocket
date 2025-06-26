@@ -1,89 +1,315 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Welcome to Firebase Hosting</title>
-
-    <!-- update the version number as needed -->
-    <script defer src="/__/firebase/11.8.1/firebase-app-compat.js"></script>
-    <!-- include only the Firebase features as you need -->
-    <script defer src="/__/firebase/11.8.1/firebase-auth-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-database-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-firestore-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-functions-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-messaging-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-storage-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-analytics-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-remote-config-compat.js"></script>
-    <script defer src="/__/firebase/11.8.1/firebase-performance-compat.js"></script>
-    <!-- 
-      initialize the SDK after all desired features are loaded, set useEmulator to false
-      to avoid connecting the SDK to running emulators.
-    -->
-    <script defer src="/__/firebase/init.js?useEmulator=true"></script>
-
-    <style media="screen">
-      body { background: #ECEFF1; color: rgba(0,0,0,0.87); font-family: Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; }
-      #message { background: white; max-width: 360px; margin: 100px auto 16px; padding: 32px 24px; border-radius: 3px; }
-      #message h2 { color: #ffa100; font-weight: bold; font-size: 16px; margin: 0 0 8px; }
-      #message h1 { font-size: 22px; font-weight: 300; color: rgba(0,0,0,0.6); margin: 0 0 16px;}
-      #message p { line-height: 140%; margin: 16px 0 24px; font-size: 14px; }
-      #message a { display: block; text-align: center; background: #039be5; text-transform: uppercase; text-decoration: none; color: white; padding: 16px; border-radius: 4px; }
-      #message, #message a { box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24); }
-      #load { color: rgba(0,0,0,0.4); text-align: center; font-size: 13px; }
-      @media (max-width: 600px) {
-        body, #message { margin-top: 0; background: white; box-shadow: none; }
-        body { border-top: 16px solid #ffa100; }
-      }
-    </style>
-  </head>
-  <body>
-    <div id="message">
-      <h2>Welcome</h2>
-      <h1>Firebase Hosting Setup Complete</h1>
-      <p>You're seeing this because you've successfully setup Firebase Hosting. Now it's time to go build something extraordinary!</p>
-      <a target="_blank" href="https://firebase.google.com/docs/hosting/">Open Hosting Documentation</a>
-    </div>
-    <p id="load">Firebase SDK Loading&hellip;</p>
-
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        const loadEl = document.querySelector('#load');
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-        // // The Firebase SDK is initialized and available here!
-        //
-        // firebase.auth().onAuthStateChanged(user => { });
-        // firebase.database().ref('/path/to/ref').on('value', snapshot => { });
-        // firebase.firestore().doc('/foo/bar').get().then(() => { });
-        // firebase.functions().httpsCallable('yourFunction')().then(() => { });
-        // firebase.messaging().requestPermission().then(() => { });
-        // firebase.storage().ref('/path/to/ref').getDownloadURL().then(() => { });
-        // firebase.analytics(); // call to activate
-        // firebase.analytics().logEvent('tutorial_completed');
-        // firebase.performance(); // call to activate
-        //
-        // // 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
-
-        try {
-          let app = firebase.app();
-          let features = [
-            'auth', 
-            'database', 
-            'firestore',
-            'functions',
-            'messaging', 
-            'storage', 
-            'analytics', 
-            'remoteConfig',
-            'performance',
-          ].filter(feature => typeof app[feature] === 'function');
-          loadEl.textContent = `Firebase SDK loaded with ${features.join(', ')}`;
-        } catch (e) {
-          console.error(e);
-          loadEl.textContent = 'Error loading the Firebase SDK, check the console.';
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Rapido Rocket</title>
+    <!-- CSP headers for Firebase -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self' https://*.firebaseio.com https://*.firebase.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.firebaseio.com https://*.firebase.com https://*.gstatic.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net;
+        style-src 'self' 'unsafe-inline';
+        connect-src 'self' https://*.firebaseio.com https://*.firebase.com wss://*.firebaseio.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net https://us-central1-rapido-captain-test.cloudfunctions.net https://us-central1-rideon-edd12.cloudfunctions.net;
+        img-src 'self' data: https:;
+        font-src 'self' data: https:;
+    ">
+    <style>
+        html, body {
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            overflow: auto;
+            background-color: #FFFFFF;
+            color: #000000;
         }
-      });
+        
+        /* Production loading screen styles */
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #FFD700 0%, #FFC107 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        #loading-content {
+            text-align: center;
+            color: black;
+            padding: 2rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 0, 0, 0.3);
+            border-top: 4px solid black;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        #root {
+            height: 100vh;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        /* Enable pointer events for inspection */
+        * {
+            pointer-events: auto !important;
+        }
+        
+        .error {
+            background: #ff4444;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .ad-blocker-notice {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 9999;
+            max-width: 400px;
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .ad-blocker-notice h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .ad-blocker-notice p {
+            color: #666;
+            line-height: 1.5;
+        }
+        .ad-blocker-notice button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .ad-blocker-notice button:hover {
+            background: #3367d6;
+        }
+    </style>
+    <!-- Enable DevTools -->
+    <script>
+        // Enable DevTools
+        if (typeof window.__REACT_DEVTOOLS_GLOBAL_HOOK__ === 'undefined') {
+            window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { isDisabled: true };
+        }
     </script>
-  </body>
+    
+
+</head>
+<body>
+    <!-- Loading screen for production builds -->
+    <div id="loading" style="display: none;">
+        <div id="loading-content">
+            <div class="spinner"></div>
+            <h2>Rapido Rocket</h2>
+            <p>Initializing...</p>
+        </div>
+    </div>
+    
+    <div id="root"></div>
+    
+    <!-- Ad Blocker Notice -->
+    <div id="adBlockerNotice" class="ad-blocker-notice">
+        <h2>Ad Blocker Detected</h2>
+        <p>We noticed that you're using an ad blocker. Our app requires access to Firebase services to function properly.</p>
+        <p>Please either:</p>
+        <p>1. Disable your ad blocker for this site<br>
+           2. Try using incognito/private browsing mode<br>
+           3. Whitelist *.firebaseio.com, *.googleapis.com</p>
+        <button onclick="location.reload()">Reload Page</button>
+    </div>
+    
+    <!-- Detect environment and load appropriate bundle -->
+    <script>
+        // Detect if this is a production build by checking for specific files
+        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        
+        if (isProduction) {
+            // Show loading screen for production
+            document.getElementById('loading').style.display = 'flex';
+            console.log('Production mode detected');
+        } else {
+            console.log('Development mode detected');
+        }
+        
+        // Load the appropriate bundle
+        if (isProduction) {
+            // Production: Load UMD bundle
+            const script = document.createElement('script');
+            script.src = 'composeApp.js';
+            script.onload = function() {
+                console.log('WASM bundle loaded successfully');
+            };
+            script.onerror = function() {
+                console.error('Failed to load WASM bundle');
+                document.getElementById('loading-content').innerHTML = 
+                    '<div class="error">Failed to load application. Please refresh the page.</div>';
+            };
+            document.body.appendChild(script);
+        } else {
+            // Development: Load ES module
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.src = 'composeApp.js';
+            document.body.appendChild(script);
+        }
+    </script>
+    <script>
+        // Define multiple CDN sources for each Firebase package
+        const cdnSources = {
+            app: [
+                'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
+                'https://unpkg.com/firebase@10.8.0/firebase-app-compat.js',
+                'https://cdn.jsdelivr.net/npm/firebase@10.8.0/firebase-app-compat.js'
+            ],
+            auth: [
+                'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js',
+                'https://unpkg.com/firebase@10.8.0/firebase-auth-compat.js',
+                'https://cdn.jsdelivr.net/npm/firebase@10.8.0/firebase-auth-compat.js'
+            ],
+            firestore: [
+                'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
+                'https://unpkg.com/firebase@10.8.0/firebase-firestore-compat.js',
+                'https://cdn.jsdelivr.net/npm/firebase@10.8.0/firebase-firestore-compat.js'
+            ],
+            functions: [
+                'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions-compat.js',
+                'https://unpkg.com/firebase@10.8.0/firebase-functions-compat.js',
+                'https://cdn.jsdelivr.net/npm/firebase@10.8.0/firebase-functions-compat.js'
+            ]
+        };
+
+        let loadAttempts = 0;
+        const MAX_ATTEMPTS = 2;
+
+        async function loadScriptWithFallback(sources) {
+            for (const src of sources) {
+                try {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = src;
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.body.appendChild(script);
+                    });
+                    console.log(`Successfully loaded: ${src}`);
+                    return true;
+                } catch (error) {
+                    console.warn(`Failed to load ${src}, trying next source...`);
+                }
+            }
+            throw new Error(`Failed to load script from all sources`);
+        }
+
+        async function initializeFirebase() {
+            try {
+                loadAttempts++;
+                // Load Firebase scripts with fallbacks
+                await loadScriptWithFallback(cdnSources.app);
+                await loadScriptWithFallback(cdnSources.auth);
+                await loadScriptWithFallback(cdnSources.firestore);
+                await loadScriptWithFallback(cdnSources.functions);
+
+                const firebaseConfig = {
+                    apiKey: "AIzaSyCSjWuJ5iHWfmyQKgHRDuVhg1-VZ05qcIg",
+                    authDomain: "rapido-captain-test.firebaseapp.com",
+                    databaseURL: "https://rapido-captain-test.firebaseio.com",
+                    projectId: "rapido-captain-test",
+                    storageBucket: "rapido-captain-test.firebasestorage.app",
+                    messagingSenderId: "468013252606",
+                    appId: "1:468013252606:web:47e9fd55e214c0e4888aaf"
+                };
+
+                // Initialize Firebase
+                window.firebase.initializeApp(firebaseConfig);
+                window.firebaseConfig = firebaseConfig;
+                window.firebaseInitialized = true;
+                console.log('Firebase initialized successfully');
+                
+                // Hide ad blocker notice if it was shown
+                document.getElementById('adBlockerNotice').style.display = 'none';
+            } catch (error) {
+                console.error('Failed to initialize Firebase:', error);
+                
+                if (loadAttempts >= MAX_ATTEMPTS) {
+                    // Show the ad blocker notice
+                    document.getElementById('adBlockerNotice').style.display = 'block';
+                } else {
+                    // Try again after a short delay
+                    setTimeout(() => initializeFirebase(), 1000);
+                }
+                window.firebaseInitializationError = error;
+            }
+        }
+
+        // Function called by Kotlin when app is ready
+        window.showApp = function() {
+            console.log('App ready, hiding loading screen...');
+            const loadingElement = document.getElementById('loading');
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+            const rootElement = document.getElementById('root');
+            if (rootElement) {
+                rootElement.style.display = 'block';
+            }
+        };
+
+        // Function to check if Firebase is already initialized
+        window.isFirebaseInitialized = function() {
+            return typeof window.firebase !== 'undefined' && window.firebase !== null && window.firebaseInitialized === true;
+        };
+
+        // Initialize everything when the page loads
+        window.addEventListener('load', function() {
+            initializeFirebase().catch(console.error);
+        });
+    </script>
+    <!-- Load composeApp.js early to ensure JS glue is available -->
+    <script src="composeApp.js"></script>
+    <!-- Your WASM/Kotlin loader should be loaded after composeApp.js -->
+    <script src="composeApp.uninstantiated.mjs"></script>
+    <!-- Add a debug script to check if validateGitHubToken is available -->
+    <script>
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('window.validateGitHubToken:', window.validateGitHubToken);
+            console.log('window keys:', Object.keys(window));
+        });
+    </script>
+</body>
 </html>

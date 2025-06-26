@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>Rapido Rocket</title>
-    <!-- Update CSP headers to allow multiple CDNs -->
+    <!-- CSP headers for Firebase -->
     <meta http-equiv="Content-Security-Policy" content="
         default-src 'self' https://*.firebaseio.com https://*.firebase.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net;
         script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.firebaseio.com https://*.firebase.com https://*.gstatic.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net;
         style-src 'self' 'unsafe-inline';
-        connect-src 'self' https://*.firebaseio.com https://*.firebase.com wss://*.firebaseio.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net;
+        connect-src 'self' https://*.firebaseio.com https://*.firebase.com wss://*.firebaseio.com https://*.googleapis.com https://unpkg.com https://cdn.jsdelivr.net https://us-central1-rapido-captain-test.cloudfunctions.net https://us-central1-rideon-edd12.cloudfunctions.net;
         img-src 'self' data: https:;
         font-src 'self' data: https:;
     ">
@@ -128,6 +128,8 @@
             window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { isDisabled: true };
         }
     </script>
+    
+
 </head>
 <body>
     <!-- Loading screen for production builds -->
@@ -182,6 +184,7 @@
         } else {
             // Development: Load ES module
             const script = document.createElement('script');
+            script.type = 'module';
             script.src = 'composeApp.js';
             document.body.appendChild(script);
         }
@@ -203,6 +206,11 @@
                 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
                 'https://unpkg.com/firebase@10.8.0/firebase-firestore-compat.js',
                 'https://cdn.jsdelivr.net/npm/firebase@10.8.0/firebase-firestore-compat.js'
+            ],
+            functions: [
+                'https://www.gstatic.com/firebasejs/10.8.0/firebase-functions-compat.js',
+                'https://unpkg.com/firebase@10.8.0/firebase-functions-compat.js',
+                'https://cdn.jsdelivr.net/npm/firebase@10.8.0/firebase-functions-compat.js'
             ]
         };
 
@@ -235,6 +243,7 @@
                 await loadScriptWithFallback(cdnSources.app);
                 await loadScriptWithFallback(cdnSources.auth);
                 await loadScriptWithFallback(cdnSources.firestore);
+                await loadScriptWithFallback(cdnSources.functions);
 
                 const firebaseConfig = {
                     apiKey: "AIzaSyCSjWuJ5iHWfmyQKgHRDuVhg1-VZ05qcIg",
@@ -289,6 +298,17 @@
         // Initialize everything when the page loads
         window.addEventListener('load', function() {
             initializeFirebase().catch(console.error);
+        });
+    </script>
+    <!-- Load composeApp.js early to ensure JS glue is available -->
+    <script src="composeApp.js"></script>
+    <!-- Your WASM/Kotlin loader should be loaded after composeApp.js -->
+    <script src="composeApp.uninstantiated.mjs"></script>
+    <!-- Add a debug script to check if validateGitHubToken is available -->
+    <script>
+        window.addEventListener('DOMContentLoaded', function() {
+            console.log('window.validateGitHubToken:', window.validateGitHubToken);
+            console.log('window keys:', Object.keys(window));
         });
     </script>
 </body>

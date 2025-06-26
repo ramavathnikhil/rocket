@@ -4,49 +4,58 @@ import com.rapido.rocket.model.GitHubConfig
 import com.rapido.rocket.model.GitHubPullRequest
 import com.rapido.rocket.model.CreatePullRequestRequest
 import com.rapido.rocket.util.currentTimeMillis
-import kotlin.js.JsAny
-import kotlin.js.Promise
-import kotlin.js.js
-import kotlin.coroutines.suspendCoroutine
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlinx.browser.window
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
-// External functions for GitHub API calls
-@JsName("createGitHubPR")
-external fun createGitHubPR(
-    repositoryUrl: String,
-    token: String,
-    title: String,
-    body: String,
-    head: String,
-    base: String
-): Promise<JsAny?>
-
-@JsName("getGitHubPR")
-external fun getGitHubPR(
-    repositoryUrl: String,
-    token: String,
-    pullNumber: Int
-): Promise<JsAny?>
-
-@JsName("mergeGitHubPR")
-external fun mergeGitHubPR(
-    repositoryUrl: String,
-    token: String,
-    pullNumber: Int,
-    mergeMethod: String
-): Promise<JsAny?>
-
-@JsName("validateGitHubToken")
-external fun validateGitHubToken(token: String): Promise<JsAny?>
-
-@JsName("validateGitHubRepo")
-external fun validateGitHubRepo(repositoryUrl: String, token: String): Promise<JsAny?>
 
 class WasmGitHubRepository : GitHubRepository {
     
     private val firestore: FirebaseFirestore = Firebase.firestore()
+    private val functions: FirebaseFunctions = Firebase.functions()
     private val githubConfigsCollection = firestore.collection("githubConfigs")
+    private val httpClient = HttpClient {
+        install(ContentNegotiation) {
+            json(Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+            })
+        }
+    }
+    
+    // Direct Firebase Functions URLs from rideon-edd12 project
+    private fun getApiEndpoint(functionName: String): String {
+        return when (functionName) {
+            "validateGitHubToken" -> "https://us-central1-rideon-edd12.cloudfunctions.net/rocketValidateGitHubToken"
+            "validateGitHubRepository" -> "https://us-central1-rideon-edd12.cloudfunctions.net/rocketValidateGitHubRepository"
+            else -> throw IllegalArgumentException("Unknown function: $functionName")
+        }
+    }
+    
+    private suspend fun getAuthToken(): String? {
+        return try {
+            val auth = Firebase.auth()
+            val currentUser = auth.currentUser
+            if (currentUser != null) {
+                currentUser.getIdToken(true).await().toString()
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            println("❌ Error getting auth token: ${e.message}")
+            null
+        }
+    }
     
     override suspend fun createPullRequest(
         repositoryUrl: String,
@@ -54,20 +63,33 @@ class WasmGitHubRepository : GitHubRepository {
         request: CreatePullRequestRequest
     ): Result<GitHubPullRequest> {
         return try {
-            val result = createGitHubPR(
-                repositoryUrl = repositoryUrl,
-                token = token,
-                title = request.title,
-                body = request.body,
-                head = request.head,
-                base = request.base
-            ).await()
+            println("🚀 Creating PR via Firebase Function: ${request.title}")
             
-            val prData = jsToMap(result!!)
-            val pullRequest = GitHubPullRequest.fromMap(prData)
-            Result.success(pullRequest)
+            val functionData = mapOf(
+                "repositoryUrl" to repositoryUrl,
+                "token" to token,
+                "title" to request.title,
+                "body" to request.body,
+                "head" to request.head,
+                "base" to request.base
+            ).toJsObject()
+            
+            val createPRFunction = functions.httpsCallable("createGitHubPullRequest")
+            val result = createPRFunction(functionData).await()
+            
+            val responseData = jsToMap(result.data!!)
+            println("✅ Firebase Function response: $responseData")
+            
+            if (responseData["success"] == true) {
+                val prData = responseData["pullRequest"] as? Map<String, Any> ?: emptyMap()
+                val pullRequest = GitHubPullRequest.fromMap(prData)
+                Result.success(pullRequest)
+            } else {
+                val errorMsg = responseData["error"] as? String ?: "Unknown error creating PR"
+                Result.failure(Exception(errorMsg))
+            }
         } catch (e: Exception) {
-            println("❌ GitHub API error: ${e.message}")
+            println("❌ Firebase Function error: ${e.message}")
             Result.failure(e)
         }
     }
@@ -78,11 +100,29 @@ class WasmGitHubRepository : GitHubRepository {
         pullNumber: Int
     ): Result<GitHubPullRequest> {
         return try {
-            val result = getGitHubPR(repositoryUrl, token, pullNumber).await()
-            val prData = jsToMap(result!!)
-            val pullRequest = GitHubPullRequest.fromMap(prData)
-            Result.success(pullRequest)
+            println("📥 Getting PR #$pullNumber via Firebase Function")
+            
+            val functionData = mapOf(
+                "repositoryUrl" to repositoryUrl,
+                "token" to token,
+                "pullNumber" to pullNumber
+            ).toJsObject()
+            
+            val getPRFunction = functions.httpsCallable("getGitHubPullRequest")
+            val result = getPRFunction(functionData).await()
+            
+            val responseData = jsToMap(result.data!!)
+            
+            if (responseData["success"] == true) {
+                val prData = responseData["pullRequest"] as? Map<String, Any> ?: emptyMap()
+                val pullRequest = GitHubPullRequest.fromMap(prData)
+                Result.success(pullRequest)
+            } else {
+                val errorMsg = responseData["error"] as? String ?: "Unknown error getting PR"
+                Result.failure(Exception(errorMsg))
+            }
         } catch (e: Exception) {
+            println("❌ Firebase Function error: ${e.message}")
             Result.failure(e)
         }
     }
@@ -94,10 +134,22 @@ class WasmGitHubRepository : GitHubRepository {
         mergeMethod: String
     ): Result<GitHubPullRequest> {
         return try {
-            mergeGitHubPR(repositoryUrl, token, pullNumber, mergeMethod).await()
-            // After merge, get the updated PR data
+            println("🔀 Merging PR #$pullNumber via Firebase Function")
+            
+            val functionData = mapOf(
+                "repositoryUrl" to repositoryUrl,
+                "token" to token,
+                "pullNumber" to pullNumber,
+                "mergeMethod" to mergeMethod
+            ).toJsObject()
+            
+            val mergePRFunction = functions.httpsCallable("mergeGitHubPullRequest")
+            mergePRFunction(functionData).await()
+            
+            // After merging, get the updated PR details
             getPullRequest(repositoryUrl, token, pullNumber)
         } catch (e: Exception) {
+            println("❌ Firebase Function error: ${e.message}")
             Result.failure(e)
         }
     }
@@ -132,21 +184,17 @@ class WasmGitHubRepository : GitHubRepository {
         return try {
             val querySnapshot = githubConfigsCollection.get().await()
             var foundConfig: GitHubConfig? = null
-            
-            querySnapshot.forEach { doc ->
+            querySnapshot.forEach { doc: FirebaseDoc ->
                 if (doc.exists) {
                     val data = doc.data()?.let { jsToMap(it) } ?: emptyMap<String, Any>()
                     val configProjectId = data["projectId"] as? String ?: ""
-                    
                     if (configProjectId == projectId) {
                         foundConfig = GitHubConfig.fromMap(data)
                         return@forEach
                     }
                 }
             }
-            
             Result.success(foundConfig)
-            
         } catch (e: Exception) {
             println("❌ Failed to get GitHub config from Firebase: ${e.message}")
             Result.failure(e)
@@ -154,7 +202,7 @@ class WasmGitHubRepository : GitHubRepository {
     }
     
     override suspend fun updateGitHubConfig(config: GitHubConfig): Result<GitHubConfig> {
-        return saveGitHubConfig(config) // Reuse save method which handles updates
+        return saveGitHubConfig(config)
     }
     
     override suspend fun deleteGitHubConfig(configId: String): Result<Unit> {
@@ -173,20 +221,98 @@ class WasmGitHubRepository : GitHubRepository {
     
     override suspend fun validateToken(token: String): Result<Boolean> {
         return try {
-            val result = validateGitHubToken(token).await()
-            val isValid = result as? Boolean ?: false
-            Result.success(isValid)
+            println("🔑 Validating GitHub token via Ktor HTTP client...")
+            
+            val apiEndpoint = getApiEndpoint("validateGitHubToken")
+            val requestBody = mapOf(
+                "token" to token
+            )
+            
+            println("🌐 Making request to: $apiEndpoint")
+            
+            val response = httpClient.post(apiEndpoint) {
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }
+            
+            println("📡 Response status: ${response.status}")
+            
+            if (response.status.isSuccess()) {
+                val responseBody = response.body<String>()
+                println("📝 Response body: $responseBody")
+                
+                // Parse the JSON response using kotlinx.serialization
+                val responseJson = Json.parseToJsonElement(responseBody).jsonObject
+                
+                val isValid = responseJson["valid"]?.jsonPrimitive?.booleanOrNull ?: false
+                
+                if (isValid) {
+                    val user = responseJson["user"]?.jsonObject
+                    val username = user?.get("login")?.jsonPrimitive?.content ?: "unknown"
+                    println("✅ Token valid for GitHub user: $username")
+                } else {
+                    val error = responseJson["error"]?.jsonPrimitive?.content
+                    println("❌ Token validation failed: ${error ?: "Unknown error"}")
+                }
+                
+                Result.success(isValid)
+            } else {
+                val errorBody = response.body<String>()
+                println("❌ HTTP Error ${response.status.value}: $errorBody")
+                Result.failure(Exception("HTTP ${response.status.value}: $errorBody"))
+            }
         } catch (e: Exception) {
+            println("❌ Ktor HTTP client error: ${e.message}")
+            println("❌ Error type: ${e::class.simpleName}")
+            e.printStackTrace()
             Result.failure(e)
         }
     }
     
     override suspend fun validateRepository(repositoryUrl: String, token: String): Result<Boolean> {
         return try {
-            val result = validateGitHubRepo(repositoryUrl, token).await()
-            val isValid = result as? Boolean ?: false
-            Result.success(isValid)
+            println("📂 Validating GitHub repository via Ktor HTTP client: $repositoryUrl")
+            
+            val apiEndpoint = getApiEndpoint("validateGitHubRepository")
+            val requestBody = mapOf(
+                "repositoryUrl" to repositoryUrl,
+                "token" to token
+            )
+            
+            println("🌐 Making request to: $apiEndpoint")
+            
+            val response = httpClient.post(apiEndpoint) {
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }
+            
+            println("📡 Response status: ${response.status}")
+            
+            if (response.status.isSuccess()) {
+                val responseBody = response.body<String>()
+                println("📝 Response body: $responseBody")
+                
+                // Parse the JSON response using kotlinx.serialization
+                val responseJson = Json.parseToJsonElement(responseBody).jsonObject
+                
+                val isValid = responseJson["valid"]?.jsonPrimitive?.booleanOrNull ?: false
+                
+                if (isValid) {
+                    val repoInfo = responseJson["repository"]?.jsonObject
+                    val repoName = repoInfo?.get("fullName")?.jsonPrimitive?.content ?: repositoryUrl
+                    println("✅ Repository accessible: $repoName")
+                }
+                
+                Result.success(isValid)
+            } else {
+                val errorBody = response.body<String>()
+                println("❌ HTTP Error ${response.status.value}: $errorBody")
+                Result.failure(Exception("HTTP ${response.status.value}: $errorBody"))
+            }
         } catch (e: Exception) {
+            println("❌ Ktor HTTP client error: ${e.message}")
+            println("❌ Error type: ${e::class.simpleName}")
+            e.printStackTrace()
             Result.failure(e)
         }
     }

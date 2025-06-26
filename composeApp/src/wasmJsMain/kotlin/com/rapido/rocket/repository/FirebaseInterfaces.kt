@@ -52,10 +52,24 @@ external interface FirebaseAuth : JsAny {
     fun onAuthStateChanged(callback: (FirebaseUser?) -> Unit)
 }
 
+// Firebase Functions interfaces
+external interface FirebaseFunctions : JsAny {
+    fun httpsCallable(name: String): FirebaseCallableFunction
+}
+
+external interface FirebaseCallableFunction : JsAny {
+    operator fun invoke(data: JsAny?): Promise<FirebaseCallableResult>
+}
+
+external interface FirebaseCallableResult : JsAny {
+    val data: JsAny?
+}
+
 @JsName("firebase")
 external object Firebase : JsAny {
     fun firestore(): FirebaseFirestore
     fun auth(): FirebaseAuth
+    fun functions(): FirebaseFunctions
 }
 
 // Shared helper functions
