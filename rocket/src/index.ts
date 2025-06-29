@@ -205,3 +205,246 @@ export const rocketValidateGitHubRepository = onRequest(
     }
   }
 );
+
+// Create GitHub Pull Request
+export const rocketCreateGitHubPullRequest = onRequest(
+  {cors: true},
+  async (req, res) => {
+    // Set CORS headers FIRST, before any other logic
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      res.set(key, value);
+    });
+
+    // Handle preflight requests immediately
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    try {
+      logger.info("createGitHubPullRequest called", {
+        method: req.method,
+        origin: req.headers.origin,
+      });
+
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      const {token, repositoryUrl, title, body, head, base} = req.body;
+
+      if (!token || !repositoryUrl || !title || !head || !base) {
+        res.status(400).json({
+          error: "GitHub token, repository URL, title, " +
+            "head, and base are required",
+        });
+        return;
+      }
+
+      const {owner, repo} = parseRepositoryUrl(repositoryUrl);
+
+      logger.info("Creating PR", {
+        owner,
+        repo,
+        title,
+        head,
+        base,
+      });
+
+      const {Octokit} = await import("@octokit/rest");
+      const octokit = new Octokit({
+        auth: token,
+      });
+
+      // Create the pull request
+      const prResponse = await octokit.rest.pulls.create({
+        owner,
+        repo,
+        title,
+        body: body || "",
+        head,
+        base,
+      });
+
+      logger.info("Pull request created successfully", {
+        prNumber: prResponse.data.number,
+        prUrl: prResponse.data.html_url,
+      });
+
+      res.json({
+        success: true,
+        pullRequest: {
+          id: prResponse.data.id,
+          number: prResponse.data.number,
+          title: prResponse.data.title,
+          body: prResponse.data.body,
+          state: prResponse.data.state,
+          html_url: prResponse.data.html_url, // Use underscore
+          diff_url: prResponse.data.diff_url,
+          patch_url: prResponse.data.patch_url,
+          head: {
+            ref: prResponse.data.head.ref,
+            sha: prResponse.data.head.sha,
+          },
+          base: {
+            ref: prResponse.data.base.ref,
+            sha: prResponse.data.base.sha,
+          },
+          created_at: prResponse.data.created_at, // Use underscore
+          updated_at: prResponse.data.updated_at, // Use underscore
+          user: {
+            login: prResponse.data.user?.login,
+            avatar_url: prResponse.data.user?.avatar_url, // Use underscore
+          },
+        },
+      });
+    } catch (error: any) {
+      logger.error("createGitHubPullRequest error:", error);
+
+      // Ensure CORS headers are set even for errors
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        res.set(key, value);
+      });
+
+      if (error.status === 422) {
+        // Handle validation errors (e.g., PR already exists)
+        res.json({
+          success: false,
+          error: `Validation error: ${error.message}. ` +
+            `This might happen if a PR already exists between these branches.`,
+        });
+        return;
+      }
+
+      if (error.status === 404) {
+        res.json({
+          success: false,
+          error: "Repository not found or no access to create PRs",
+        });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Get GitHub Pull Request
+export const rocketGetGitHubPullRequest = onRequest(
+  {cors: true},
+  async (req, res) => {
+    // Set CORS headers FIRST, before any other logic
+    Object.entries(corsHeaders).forEach(([key, value]) => {
+      res.set(key, value);
+    });
+
+    // Handle preflight requests immediately
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
+
+    try {
+      logger.info("getGitHubPullRequest called", {
+        method: req.method,
+        origin: req.headers.origin,
+      });
+
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      const {token, repositoryUrl, pullNumber} = req.body;
+
+      if (!token || !repositoryUrl || !pullNumber) {
+        res.status(400).json({
+          error: "GitHub token, repository URL, " +
+            "and pull number are required",
+        });
+        return;
+      }
+
+      const {owner, repo} = parseRepositoryUrl(repositoryUrl);
+
+      logger.info("Getting PR", {
+        owner,
+        repo,
+        pullNumber,
+      });
+
+      const {Octokit} = await import("@octokit/rest");
+      const octokit = new Octokit({
+        auth: token,
+      });
+
+      // Get the pull request
+      const prResponse = await octokit.rest.pulls.get({
+        owner,
+        repo,
+        pull_number: pullNumber,
+      });
+
+      logger.info("Pull request retrieved successfully", {
+        prNumber: prResponse.data.number,
+        prState: prResponse.data.state,
+        prUrl: prResponse.data.html_url,
+      });
+
+      res.json({
+        success: true,
+        pullRequest: {
+          id: prResponse.data.id,
+          number: prResponse.data.number,
+          title: prResponse.data.title,
+          body: prResponse.data.body,
+          state: prResponse.data.state,
+          merged: prResponse.data.merged,
+          mergeable: prResponse.data.mergeable,
+          html_url: prResponse.data.html_url, // Use underscore
+          diff_url: prResponse.data.diff_url,
+          patch_url: prResponse.data.patch_url,
+          head: {
+            ref: prResponse.data.head.ref,
+            sha: prResponse.data.head.sha,
+          },
+          base: {
+            ref: prResponse.data.base.ref,
+            sha: prResponse.data.base.sha,
+          },
+          created_at: prResponse.data.created_at, // Use underscore
+          updated_at: prResponse.data.updated_at, // Use underscore
+          merged_at: prResponse.data.merged_at, // Use underscore
+          user: {
+            login: prResponse.data.user?.login,
+            avatar_url: prResponse.data.user?.avatar_url, // Use underscore
+          },
+        },
+      });
+    } catch (error: any) {
+      logger.error("getGitHubPullRequest error:", error);
+
+      // Ensure CORS headers are set even for errors
+      Object.entries(corsHeaders).forEach(([key, value]) => {
+        res.set(key, value);
+      });
+
+      if (error.status === 404) {
+        res.json({
+          success: false,
+          error: "Pull request not found or no access",
+        });
+        return;
+      }
+
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
