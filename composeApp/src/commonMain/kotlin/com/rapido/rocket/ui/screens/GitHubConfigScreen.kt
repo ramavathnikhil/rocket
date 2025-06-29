@@ -429,6 +429,13 @@ fun GitHubConfigScreen(
                                 isSaving = true
                                 val currentUser = authRepository.getCurrentUser()
                                 
+                                println("🔍 Preparing to save GitHub config:")
+                                println("   - Form appRepositoryUrl: '$appRepositoryUrl'")
+                                println("   - Form bffRepositoryUrl: '$bffRepositoryUrl'")
+                                println("   - Form githubToken length: ${githubToken.length}")
+                                println("   - Form defaultBaseBranch: '$defaultBaseBranch'")
+                                println("   - Form defaultTargetBranch: '$defaultTargetBranch'")
+                                
                                 val configToSave = githubConfig?.copy(
                                     appRepositoryUrl = appRepositoryUrl,
                                     bffRepositoryUrl = bffRepositoryUrl,
@@ -446,6 +453,12 @@ fun GitHubConfigScreen(
                                     createdAt = currentTimeMillis(),
                                     updatedAt = currentTimeMillis()
                                 )
+                                
+                                println("🔍 Final config to save:")
+                                println("   - projectId: '${configToSave.projectId}'")
+                                println("   - appRepositoryUrl: '${configToSave.appRepositoryUrl}'")
+                                println("   - bffRepositoryUrl: '${configToSave.bffRepositoryUrl}'")
+                                println("   - githubToken length: ${configToSave.githubToken.length}")
                                 
                                 val result = githubRepository.saveGitHubConfig(configToSave)
                                 result.fold(

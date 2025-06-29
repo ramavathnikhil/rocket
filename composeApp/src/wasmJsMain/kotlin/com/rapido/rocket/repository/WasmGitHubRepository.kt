@@ -38,6 +38,8 @@ class WasmGitHubRepository : GitHubRepository {
         return when (functionName) {
             "validateGitHubToken" -> "https://us-central1-rideon-edd12.cloudfunctions.net/rocketValidateGitHubToken"
             "validateGitHubRepository" -> "https://us-central1-rideon-edd12.cloudfunctions.net/rocketValidateGitHubRepository"
+            "createGitHubPullRequest" -> "https://us-central1-rideon-edd12.cloudfunctions.net/rocketCreateGitHubPullRequest"
+            "getGitHubPullRequest" -> "https://us-central1-rideon-edd12.cloudfunctions.net/rocketGetGitHubPullRequest"
             else -> throw IllegalArgumentException("Unknown function: $functionName")
         }
     }
@@ -63,33 +65,90 @@ class WasmGitHubRepository : GitHubRepository {
         request: CreatePullRequestRequest
     ): Result<GitHubPullRequest> {
         return try {
-            println("🚀 Creating PR via Firebase Function: ${request.title}")
+            println("🚀 Creating PR via HTTP client instead of Firebase Functions: ${request.title}")
+            println("🔍 Repository URL: $repositoryUrl")
+            println("🔍 Token length: ${token.length}")
             
-            val functionData = mapOf(
+            // Use direct HTTP call instead of Firebase Functions to avoid JS exceptions
+            val apiEndpoint = "https://us-central1-rideon-edd12.cloudfunctions.net/rocketCreateGitHubPullRequest"
+            val requestBody = mapOf(
                 "repositoryUrl" to repositoryUrl,
                 "token" to token,
                 "title" to request.title,
                 "body" to request.body,
                 "head" to request.head,
                 "base" to request.base
-            ).toJsObject()
+            )
             
-            val createPRFunction = functions.httpsCallable("createGitHubPullRequest")
-            val result = createPRFunction(functionData).await()
+            println("🌐 Making HTTP request to: $apiEndpoint")
             
-            val responseData = jsToMap(result.data!!)
-            println("✅ Firebase Function response: $responseData")
+            val response = httpClient.post(apiEndpoint) {
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }
             
-            if (responseData["success"] == true) {
-                val prData = responseData["pullRequest"] as? Map<String, Any> ?: emptyMap()
-                val pullRequest = GitHubPullRequest.fromMap(prData)
-                Result.success(pullRequest)
+            println("📡 Response status: ${response.status}")
+            
+            if (response.status.isSuccess()) {
+                val responseBody = response.body<String>()
+                println("📝 Response body: $responseBody")
+                
+                // Parse the JSON response using kotlinx.serialization
+                val responseJson = Json.parseToJsonElement(responseBody).jsonObject
+                
+                val success = responseJson["success"]?.jsonPrimitive?.booleanOrNull ?: false
+                
+                if (success) {
+                    val prData = responseJson["pullRequest"]?.jsonObject
+                    if (prData != null) {
+                        // Convert JsonObject to Map for GitHubPullRequest.fromMap
+                        val prMap = mutableMapOf<String, Any>()
+                        prData.forEach { (key, value) ->
+                            when {
+                                value is kotlinx.serialization.json.JsonPrimitive -> {
+                                    if (value.isString) {
+                                        prMap[key] = value.content
+                                    } else {
+                                        prMap[key] = value.content
+                                    }
+                                }
+                                value is kotlinx.serialization.json.JsonObject -> {
+                                    // Handle nested objects like head, base, user
+                                    val nestedMap = mutableMapOf<String, Any>()
+                                    value.forEach { (nestedKey, nestedValue) ->
+                                        when {
+                                            nestedValue is kotlinx.serialization.json.JsonPrimitive -> {
+                                                nestedMap[nestedKey] = nestedValue.content
+                                            }
+                                            else -> nestedMap[nestedKey] = nestedValue.toString()
+                                        }
+                                    }
+                                    prMap[key] = nestedMap
+                                }
+                                else -> prMap[key] = value.toString()
+                            }
+                        }
+                        
+                        val pullRequest = GitHubPullRequest.fromMap(prMap)
+                        println("✅ GitHub PR created successfully: ${pullRequest.htmlUrl}")
+                        Result.success(pullRequest)
+                    } else {
+                        Result.failure(Exception("No pull request data in response"))
+                    }
+                } else {
+                    val error = responseJson["error"]?.jsonPrimitive?.content ?: "Unknown error creating PR"
+                    println("❌ PR creation failed: $error")
+                    Result.failure(Exception(error))
+                }
             } else {
-                val errorMsg = responseData["error"] as? String ?: "Unknown error creating PR"
-                Result.failure(Exception(errorMsg))
+                val errorBody = response.body<String>()
+                println("❌ HTTP Error ${response.status.value}: $errorBody")
+                Result.failure(Exception("HTTP ${response.status.value}: $errorBody"))
             }
         } catch (e: Exception) {
-            println("❌ Firebase Function error: ${e.message}")
+            println("❌ Error creating PR: ${e.message}")
+            println("❌ Error type: ${e::class.simpleName}")
+            e.printStackTrace()
             Result.failure(e)
         }
     }
@@ -100,29 +159,84 @@ class WasmGitHubRepository : GitHubRepository {
         pullNumber: Int
     ): Result<GitHubPullRequest> {
         return try {
-            println("📥 Getting PR #$pullNumber via Firebase Function")
+            println("📥 Getting PR #$pullNumber via HTTP client: $repositoryUrl")
             
-            val functionData = mapOf(
+            val apiEndpoint = "https://us-central1-rideon-edd12.cloudfunctions.net/rocketGetGitHubPullRequest"
+            val requestBody = mapOf(
                 "repositoryUrl" to repositoryUrl,
                 "token" to token,
                 "pullNumber" to pullNumber
-            ).toJsObject()
+            )
             
-            val getPRFunction = functions.httpsCallable("getGitHubPullRequest")
-            val result = getPRFunction(functionData).await()
+            println("🌐 Making request to: $apiEndpoint")
             
-            val responseData = jsToMap(result.data!!)
+            val response = httpClient.post(apiEndpoint) {
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }
             
-            if (responseData["success"] == true) {
-                val prData = responseData["pullRequest"] as? Map<String, Any> ?: emptyMap()
-                val pullRequest = GitHubPullRequest.fromMap(prData)
-                Result.success(pullRequest)
+            println("📡 Response status: ${response.status}")
+            
+            if (response.status.isSuccess()) {
+                val responseBody = response.body<String>()
+                println("📝 Response body: $responseBody")
+                
+                // Parse the JSON response using kotlinx.serialization
+                val responseJson = Json.parseToJsonElement(responseBody).jsonObject
+                
+                val success = responseJson["success"]?.jsonPrimitive?.booleanOrNull ?: false
+                
+                if (success) {
+                    val prData = responseJson["pullRequest"]?.jsonObject
+                    if (prData != null) {
+                        // Convert JsonObject to Map for GitHubPullRequest.fromMap
+                        val prMap = mutableMapOf<String, Any>()
+                        prData.forEach { (key, value) ->
+                            when {
+                                value is kotlinx.serialization.json.JsonPrimitive -> {
+                                    if (value.isString) {
+                                        prMap[key] = value.content
+                                    } else {
+                                        prMap[key] = value.content
+                                    }
+                                }
+                                value is kotlinx.serialization.json.JsonObject -> {
+                                    // Handle nested objects like head, base, user
+                                    val nestedMap = mutableMapOf<String, Any>()
+                                    value.forEach { (nestedKey, nestedValue) ->
+                                        when {
+                                            nestedValue is kotlinx.serialization.json.JsonPrimitive -> {
+                                                nestedMap[nestedKey] = nestedValue.content
+                                            }
+                                            else -> nestedMap[nestedKey] = nestedValue.toString()
+                                        }
+                                    }
+                                    prMap[key] = nestedMap
+                                }
+                                else -> prMap[key] = value.toString()
+                            }
+                        }
+                        
+                        val pullRequest = GitHubPullRequest.fromMap(prMap)
+                        println("✅ GitHub PR retrieved successfully: ${pullRequest.htmlUrl}")
+                        Result.success(pullRequest)
+                    } else {
+                        Result.failure(Exception("No pull request data in response"))
+                    }
+                } else {
+                    val error = responseJson["error"]?.jsonPrimitive?.content ?: "Unknown error getting PR"
+                    println("❌ PR retrieval failed: $error")
+                    Result.failure(Exception(error))
+                }
             } else {
-                val errorMsg = responseData["error"] as? String ?: "Unknown error getting PR"
-                Result.failure(Exception(errorMsg))
+                val errorBody = response.body<String>()
+                println("❌ HTTP Error ${response.status.value}: $errorBody")
+                Result.failure(Exception("HTTP ${response.status.value}: $errorBody"))
             }
         } catch (e: Exception) {
-            println("❌ Firebase Function error: ${e.message}")
+            println("❌ Error getting PR: ${e.message}")
+            println("❌ Error type: ${e::class.simpleName}")
+            e.printStackTrace()
             Result.failure(e)
         }
     }
@@ -133,29 +247,18 @@ class WasmGitHubRepository : GitHubRepository {
         pullNumber: Int,
         mergeMethod: String
     ): Result<GitHubPullRequest> {
-        return try {
-            println("🔀 Merging PR #$pullNumber via Firebase Function")
-            
-            val functionData = mapOf(
-                "repositoryUrl" to repositoryUrl,
-                "token" to token,
-                "pullNumber" to pullNumber,
-                "mergeMethod" to mergeMethod
-            ).toJsObject()
-            
-            val mergePRFunction = functions.httpsCallable("mergeGitHubPullRequest")
-            mergePRFunction(functionData).await()
-            
-            // After merging, get the updated PR details
-            getPullRequest(repositoryUrl, token, pullNumber)
-        } catch (e: Exception) {
-            println("❌ Firebase Function error: ${e.message}")
-            Result.failure(e)
-        }
+        // We don't implement merge via API - users should merge directly on GitHub
+        return Result.failure(Exception("PR merging should be done directly on GitHub. Use the 'View PR' button to open the PR in GitHub and merge it there."))
     }
     
     override suspend fun saveGitHubConfig(config: GitHubConfig): Result<GitHubConfig> {
         return try {
+            println("🔍 Saving GitHub config:")
+            println("   - projectId: '${config.projectId}'")
+            println("   - appRepositoryUrl: '${config.appRepositoryUrl}'")
+            println("   - bffRepositoryUrl: '${config.bffRepositoryUrl}'")
+            println("   - githubToken length: ${config.githubToken.length}")
+            
             val configWithId = if (config.id.isEmpty()) {
                 config.copy(
                     id = "github_${currentTimeMillis()}_${(100..999).random()}",
@@ -167,6 +270,11 @@ class WasmGitHubRepository : GitHubRepository {
             }
             
             val configDataMap = configWithId.toMap()
+            println("🔍 Config data map before saving:")
+            configDataMap.forEach { (key, value) ->
+                println("   - $key: '$value'")
+            }
+            
             val jsConfigData = configDataMap.toJsObject()
             val docRef = githubConfigsCollection.doc(configWithId.id)
             docRef.set(jsConfigData).await()
@@ -182,18 +290,52 @@ class WasmGitHubRepository : GitHubRepository {
     
     override suspend fun getGitHubConfig(projectId: String): Result<GitHubConfig?> {
         return try {
+            println("🔍 Fetching GitHub config for projectId: '$projectId'")
             val querySnapshot = githubConfigsCollection.get().await()
             var foundConfig: GitHubConfig? = null
+            
+
+            var index = 0
             querySnapshot.forEach { doc: FirebaseDoc ->
                 if (doc.exists) {
+                    index++
                     val data = doc.data()?.let { jsToMap(it) } ?: emptyMap<String, Any>()
                     val configProjectId = data["projectId"] as? String ?: ""
+                    
+                    println("   📄 Raw data keys: ${data.keys}")
+                    println("   📋 All key-value pairs:")
+                    data.forEach { (key, value) ->
+                        when (key) {
+                            "githubToken" -> println("      $key: '${value.toString().take(10)}...' (length: ${value.toString().length})")
+                            else -> println("      $key: '$value'")
+                        }
+                    }
+                    println("   🎯 Parsed values:")
+                    println("      projectId: '$configProjectId'")
+                    println("      appRepositoryUrl: '${data["appRepositoryUrl"] as? String ?: ""}'")
+                    println("      bffRepositoryUrl: '${data["bffRepositoryUrl"] as? String ?: ""}'")
+                    println("      githubToken length: ${(data["githubToken"] as? String ?: "").length}")
+                    println("      defaultBaseBranch: '${data["defaultBaseBranch"] as? String ?: ""}'")
+                    println("      defaultTargetBranch: '${data["defaultTargetBranch"] as? String ?: ""}'")
+                    println("   ⚖️ Match check: '$configProjectId' == '$projectId' ? ${configProjectId == projectId}")
+                    
                     if (configProjectId == projectId) {
+                        println("✅ Found matching config for projectId: '$projectId'")
                         foundConfig = GitHubConfig.fromMap(data)
+                        println("🔍 Loaded config object:")
+                        println("   - appRepositoryUrl: '${foundConfig?.appRepositoryUrl}'")
+                        println("   - bffRepositoryUrl: '${foundConfig?.bffRepositoryUrl}'")
                         return@forEach
                     }
+                    println("   ❌ No match, continuing...")
+                    println()
                 }
             }
+            
+            if (foundConfig == null) {
+                println("⚠️ No GitHub config found for projectId: '$projectId'")
+            }
+            
             Result.success(foundConfig)
         } catch (e: Exception) {
             println("❌ Failed to get GitHub config from Firebase: ${e.message}")

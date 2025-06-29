@@ -10,6 +10,111 @@ class GitHubWorkflowService(
     private val workflowRepository: WorkflowRepository
 ) {
     
+    /**
+     * Check if this is a develop to release PR step (step 2 or 3)
+     */
+    fun isDevelopToReleasePRStep(step: WorkflowStep): Boolean {
+        return (step.stepNumber == 2 || step.stepNumber == 3) && 
+               step.repositoryType.isNotEmpty() &&
+               step.sourceBranch == "develop" &&
+               step.targetBranch == "release"
+    }
+    
+    /**
+     * Create PR specifically for develop to release steps (step 2 and 3)
+     */
+    suspend fun createDevelopToReleasePR(
+        step: WorkflowStep,
+        release: Release,
+        githubConfig: GitHubConfig
+    ): Result<WorkflowStep> {
+        return try {
+            // Validate this is a develop to release step
+            if (!isDevelopToReleasePRStep(step)) {
+                return Result.failure(Exception("This method is only for develop to release PR steps (step 2 and 3)"))
+            }
+            
+            // Determine which repository to use
+            val repositoryUrl = when (step.repositoryType) {
+                "app" -> githubConfig.appRepositoryUrl
+                "bff" -> githubConfig.bffRepositoryUrl
+                else -> return Result.failure(Exception("Unknown repository type: ${step.repositoryType}"))
+            }
+            
+            println("🔍 Repository URL resolution:")
+            println("   - Step repository type: '${step.repositoryType}'")
+            println("   - GitHub config app URL: '${githubConfig.appRepositoryUrl}'")
+            println("   - GitHub config bff URL: '${githubConfig.bffRepositoryUrl}'")
+            println("   - Resolved repository URL: '$repositoryUrl'")
+            
+            if (repositoryUrl.isEmpty()) {
+                return Result.failure(Exception("${step.repositoryType.uppercase()} repository URL not configured in GitHub settings"))
+            }
+            
+            // Create PR title and body
+            val prTitle = "Release ${release.version}: ${step.repositoryType.uppercase()} develop to release"
+            val prBody = buildString {
+                append("## Release ${release.version}: ${release.title}\n\n")
+                append("**Repository:** ${step.repositoryType.uppercase()}\n")
+                append("**Branches:** develop → release\n")
+                append("**Release Description:** ${release.description}\n\n")
+                if (release.notes.isNotEmpty()) {
+                    append("**Release Notes:**\n${release.notes}\n\n")
+                }
+                append("---\n")
+                append("**Workflow Step:** ${step.stepNumber} - ${step.title}\n")
+                append("**Step Description:** ${step.description}\n\n")
+                append("_This PR was created via Rapido Rocket release management workflow._")
+            }
+            
+            val createPrRequest = CreatePullRequestRequest(
+                title = prTitle,
+                body = prBody,
+                head = "develop", // Always develop for these steps
+                base = "release", // Always release for these steps
+                draft = false
+            )
+            
+            // Create the PR
+            val prResult = githubRepository.createPullRequest(
+                repositoryUrl = repositoryUrl,
+                token = githubConfig.githubToken,
+                request = createPrRequest
+            )
+            
+            prResult.fold(
+                onSuccess = { pr ->
+                    // Update the step with PR information
+                    val updatedStep = step.copy(
+                        githubPrNumber = pr.number,
+                        githubPrUrl = pr.htmlUrl,
+                        githubPrState = pr.state,
+                        actionUrl = pr.htmlUrl
+                    )
+                    
+                    // Save the updated step
+                    val saveResult = workflowRepository.updateWorkflowStep(updatedStep)
+                    saveResult.fold(
+                        onSuccess = { savedStep ->
+                            println("✅ PR created and step updated: ${pr.htmlUrl}")
+                            Result.success(savedStep)
+                        },
+                        onFailure = { error ->
+                            println("⚠️ PR created but failed to update step: ${error.message}")
+                            // Return the updated step even if save failed
+                            Result.success(updatedStep)
+                        }
+                    )
+                },
+                onFailure = { error ->
+                    Result.failure(Exception("Failed to create PR: ${error.message}"))
+                }
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
     suspend fun createPullRequestForStep(
         step: WorkflowStep,
         release: Release,

@@ -89,37 +89,86 @@ external object console {
 fun jsToMap(jsObject: JsAny): Map<String, Any> {
     return try {
         val jsonString = JSON.stringify(jsObject)
-        println("Firebase: Firestore data JSON: $jsonString")
-        
+
         val map = mutableMapOf<String, Any>()
         
-        if (jsonString.startsWith("{") && jsonString.endsWith("}")) {
-            val content = jsonString.substring(1, jsonString.length - 1)
-            val pairs = content.split(",")
+        // Use regex to properly parse JSON instead of naive string splitting
+        // This regex handles URLs with colons correctly
+        val jsonPattern = """"([^"]+)"\s*:\s*("([^"]*)"|(\d+\.?\d*)|true|false|null)""".toRegex()
+        val matches = jsonPattern.findAll(jsonString)
+        
+        for (match in matches) {
+            val key = match.groupValues[1]
+            val rawValue = match.groupValues[2]
             
-            for (pair in pairs) {
-                val keyValue = pair.split(":")
-                if (keyValue.size == 2) {
-                    val key = keyValue[0].trim().removeSurrounding("\"")
-                    val valueStr = keyValue[1].trim()
-                    
-                    val value: Any = when {
-                        valueStr == "true" -> true
-                        valueStr == "false" -> false
-                        valueStr.startsWith("\"") && valueStr.endsWith("\"") -> valueStr.removeSurrounding("\"")
-                        valueStr.contains(".") -> valueStr.toDoubleOrNull() ?: valueStr
-                        else -> valueStr.toLongOrNull() ?: valueStr
-                    }
-                    map[key] = value
+            val value: Any = when {
+                rawValue == "true" -> true
+                rawValue == "false" -> false
+                rawValue == "null" -> ""
+                rawValue.startsWith("\"") && rawValue.endsWith("\"") -> {
+                    // Properly handle quoted strings (including URLs)
+                    rawValue.substring(1, rawValue.length - 1)
                 }
+                rawValue.toDoubleOrNull() != null -> rawValue.toDouble()
+                rawValue.toLongOrNull() != null -> rawValue.toLong()
+                else -> rawValue
             }
+            
+            map[key] = value
         }
         
-        println("Firebase: Parsed map: $map")
         map
     } catch (e: Exception) {
-        println("Firebase: Error parsing JS object: $e")
-        emptyMap()
+        println("Firebase: Error parsing JS object with regex: $e")
+        println("Firebase: Falling back to simple approach")
+        
+        // Simple fallback that just extracts basic fields
+        try {
+            val jsonString = JSON.stringify(jsObject)
+            val map = mutableMapOf<String, Any>()
+            
+            // Extract basic patterns - this should work for most cases
+            if (jsonString.contains("\"appRepositoryUrl\":")) {
+                val appRepoMatch = """"appRepositoryUrl"\s*:\s*"([^"]*)" """.toRegex().find(jsonString)
+                appRepoMatch?.let { 
+                    map["appRepositoryUrl"] = it.groupValues[1]
+                    println("Firebase: Extracted appRepositoryUrl = '${it.groupValues[1]}'")
+                }
+            }
+            
+            if (jsonString.contains("\"bffRepositoryUrl\":")) {
+                val bffRepoMatch = """"bffRepositoryUrl"\s*:\s*"([^"]*)" """.toRegex().find(jsonString)
+                bffRepoMatch?.let { 
+                    map["bffRepositoryUrl"] = it.groupValues[1]
+                    println("Firebase: Extracted bffRepositoryUrl = '${it.groupValues[1]}'")
+                }
+            }
+            
+            // Extract other common fields
+            listOf("id", "projectId", "githubToken", "defaultBaseBranch", "defaultTargetBranch").forEach { field ->
+                val pattern = """"$field"\s*:\s*"([^"]*)" """.toRegex()
+                val match = pattern.find(jsonString)
+                match?.let {
+                    map[field] = it.groupValues[1]
+                    println("Firebase: Extracted $field = '${it.groupValues[1]}'")
+                }
+            }
+            
+            // Extract numeric fields
+            listOf("createdAt", "updatedAt").forEach { field ->
+                val pattern = """"$field"\s*:\s*(\d+)""".toRegex()
+                val match = pattern.find(jsonString)
+                match?.let {
+                    map[field] = it.groupValues[1].toLong()
+                    println("Firebase: Extracted $field = ${it.groupValues[1]}")
+                }
+            }
+            
+            map
+        } catch (fallbackError: Exception) {
+            println("Firebase: All parsing methods failed: $fallbackError")
+            emptyMap()
+        }
     }
 }
 
