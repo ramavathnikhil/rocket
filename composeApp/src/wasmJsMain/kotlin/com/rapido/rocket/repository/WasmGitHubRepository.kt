@@ -129,7 +129,17 @@ class WasmGitHubRepository : GitHubRepository {
                             }
                         }
                         
+                        println("🔍 prMap before GitHubPullRequest.fromMap:")
+                        prMap.forEach { (key, value) ->
+                            println("   $key: '$value' (${value::class.simpleName})")
+                        }
+                        
                         val pullRequest = GitHubPullRequest.fromMap(prMap)
+                        println("🔍 GitHubPullRequest after fromMap:")
+                        println("   number: ${pullRequest.number}")
+                        println("   htmlUrl: '${pullRequest.htmlUrl}'")
+                        println("   state: '${pullRequest.state}'")
+                        
                         println("✅ GitHub PR created successfully: ${pullRequest.htmlUrl}")
                         Result.success(pullRequest)
                     } else {

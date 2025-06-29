@@ -43,7 +43,14 @@ class WasmFirebaseWorkflowRepository : WorkflowRepository {
                 "isRequired" to stepWithId.isRequired,
                 "dependsOn" to stepWithId.dependsOn,
                 "estimatedDuration" to stepWithId.estimatedDuration,
-                "actualDuration" to stepWithId.actualDuration
+                "actualDuration" to stepWithId.actualDuration,
+                // GitHub integration fields
+                "githubPrNumber" to (stepWithId.githubPrNumber ?: ""),
+                "githubPrUrl" to stepWithId.githubPrUrl,
+                "githubPrState" to stepWithId.githubPrState,
+                "repositoryType" to stepWithId.repositoryType,
+                "sourceBranch" to stepWithId.sourceBranch,
+                "targetBranch" to stepWithId.targetBranch
             )
             
             val jsStepData = stepDataMap.toJsObject()
@@ -81,8 +88,30 @@ class WasmFirebaseWorkflowRepository : WorkflowRepository {
                 "isRequired" to updatedStep.isRequired,
                 "dependsOn" to updatedStep.dependsOn,
                 "estimatedDuration" to updatedStep.estimatedDuration,
-                "actualDuration" to updatedStep.actualDuration
+                "actualDuration" to updatedStep.actualDuration,
+                // GitHub integration fields
+                "githubPrNumber" to (updatedStep.githubPrNumber ?: ""),
+                "githubPrUrl" to updatedStep.githubPrUrl,
+                "githubPrState" to updatedStep.githubPrState,
+                "repositoryType" to updatedStep.repositoryType,
+                "sourceBranch" to updatedStep.sourceBranch,
+                "targetBranch" to updatedStep.targetBranch
             )
+            
+            println("🔍 SAVING WORKFLOW STEP TO FIREBASE:")
+            println("   Step ID: '${step.id}'")
+            println("   Step Number: ${updatedStep.stepNumber}")
+            println("   Title: '${updatedStep.title}'")
+            println("   GitHub PR Number: ${updatedStep.githubPrNumber}")
+            println("   GitHub PR URL: '${updatedStep.githubPrUrl}'")
+            println("   GitHub PR State: '${updatedStep.githubPrState}'")
+            println("   Repository Type: '${updatedStep.repositoryType}'")
+            println("   Source Branch: '${updatedStep.sourceBranch}'")
+            println("   Target Branch: '${updatedStep.targetBranch}'")
+            println("   Complete stepDataMap:")
+            stepDataMap.forEach { (key, value) ->
+                println("      $key: '$value'")
+            }
             
             val jsStepData = stepDataMap.toJsObject()
             val docRef = workflowStepsCollection.doc(step.id)
@@ -118,6 +147,20 @@ class WasmFirebaseWorkflowRepository : WorkflowRepository {
             
             if (docSnapshot.exists) {
                 val data = docSnapshot.data()?.let { jsToMap(it) } ?: emptyMap<String, Any>()
+                
+                println("🔍 LOADING WORKFLOW STEP FROM FIREBASE:")
+                println("   Step ID: '$stepId'")
+                println("   Raw data keys: ${data.keys}")
+                println("   Complete data map:")
+                data.forEach { (key, value) ->
+                    println("      $key: '$value'")
+                }
+                println("   GitHub PR fields from data:")
+                println("      githubPrNumber: '${data["githubPrNumber"]}'")
+                println("      githubPrUrl: '${data["githubPrUrl"]}'")
+                println("      githubPrState: '${data["githubPrState"]}'")
+                println("      repositoryType: '${data["repositoryType"]}'")
+                
                 val workflowStep = WorkflowStep(
                     id = data["id"] as? String ?: stepId,
                     releaseId = data["releaseId"] as? String ?: "",
@@ -136,7 +179,14 @@ class WasmFirebaseWorkflowRepository : WorkflowRepository {
                     isRequired = data["isRequired"] as? Boolean ?: true,
                     dependsOn = (data["dependsOn"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                     estimatedDuration = (data["estimatedDuration"] as? Number)?.toInt() ?: 0,
-                    actualDuration = (data["actualDuration"] as? Number)?.toInt() ?: 0
+                    actualDuration = (data["actualDuration"] as? Number)?.toInt() ?: 0,
+                    // GitHub integration fields
+                    githubPrNumber = (data["githubPrNumber"] as? Number)?.toInt(),
+                    githubPrUrl = data["githubPrUrl"] as? String ?: "",
+                    githubPrState = data["githubPrState"] as? String ?: "",
+                    repositoryType = data["repositoryType"] as? String ?: "",
+                    sourceBranch = data["sourceBranch"] as? String ?: "",
+                    targetBranch = data["targetBranch"] as? String ?: ""
                 )
                 Result.success(workflowStep)
             } else {
@@ -178,7 +228,14 @@ class WasmFirebaseWorkflowRepository : WorkflowRepository {
                             isRequired = data["isRequired"] as? Boolean ?: true,
                             dependsOn = (data["dependsOn"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                             estimatedDuration = (data["estimatedDuration"] as? Number)?.toInt() ?: 0,
-                            actualDuration = (data["actualDuration"] as? Number)?.toInt() ?: 0
+                            actualDuration = (data["actualDuration"] as? Number)?.toInt() ?: 0,
+                            // GitHub integration fields
+                            githubPrNumber = (data["githubPrNumber"] as? Number)?.toInt(),
+                            githubPrUrl = data["githubPrUrl"] as? String ?: "",
+                            githubPrState = data["githubPrState"] as? String ?: "",
+                            repositoryType = data["repositoryType"] as? String ?: "",
+                            sourceBranch = data["sourceBranch"] as? String ?: "",
+                            targetBranch = data["targetBranch"] as? String ?: ""
                         )
                         steps.add(workflowStep)
                     }

@@ -92,6 +92,17 @@ class GitHubWorkflowService(
                         actionUrl = pr.htmlUrl
                     )
                     
+                    println("🔍 GITHUB WORKFLOW SERVICE - About to save step:")
+                    println("   Step ID: '${updatedStep.id}'")
+                    println("   Step Number: ${updatedStep.stepNumber}")
+                    println("   Title: '${updatedStep.title}'")
+                    println("   GitHub PR Number: ${updatedStep.githubPrNumber}")
+                    println("   GitHub PR URL: '${updatedStep.githubPrUrl}'")
+                    println("   GitHub PR State: '${updatedStep.githubPrState}'")
+                    println("   Repository Type: '${updatedStep.repositoryType}'")
+                    println("   Source Branch: '${updatedStep.sourceBranch}'")
+                    println("   Target Branch: '${updatedStep.targetBranch}'")
+                    
                     // Save the updated step
                     val saveResult = workflowRepository.updateWorkflowStep(updatedStep)
                     saveResult.fold(
