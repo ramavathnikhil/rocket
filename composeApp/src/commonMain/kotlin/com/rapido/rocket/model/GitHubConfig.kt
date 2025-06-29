@@ -63,12 +63,14 @@ data class GitHubPullRequest(
                 title = map["title"] as? String ?: "",
                 body = map["body"] as? String ?: "",
                 state = map["state"] as? String ?: "",
-                htmlUrl = map["html_url"] as? String ?: "",
+                // Handle both camelCase and snake_case for htmlUrl
+                htmlUrl = (map["htmlUrl"] as? String) ?: (map["html_url"] as? String) ?: "",
                 headBranch = (map["head"] as? Map<String, Any>)?.get("ref") as? String ?: "",
                 baseBranch = (map["base"] as? Map<String, Any>)?.get("ref") as? String ?: "",
-                createdAt = map["created_at"] as? String ?: "",
-                updatedAt = map["updated_at"] as? String ?: "",
-                mergedAt = map["merged_at"] as? String
+                // Handle both camelCase and snake_case for timestamps
+                createdAt = (map["createdAt"] as? String) ?: (map["created_at"] as? String) ?: "",
+                updatedAt = (map["updatedAt"] as? String) ?: (map["updated_at"] as? String) ?: "",
+                mergedAt = (map["mergedAt"] as? String) ?: (map["merged_at"] as? String)
             )
         }
     }
