@@ -1,0 +1,15 @@
+name: Manual Trigger Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-manual-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Print Hello Message
+        run: echo "Hello, World! This workflow was triggered manually."
