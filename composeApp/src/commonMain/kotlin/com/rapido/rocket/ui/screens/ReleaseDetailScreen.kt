@@ -36,9 +36,11 @@ fun ReleaseDetailScreen(
     var isLoading by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var successMessage by remember { mutableStateOf<String?>(null) }
     var loadingSteps by remember { mutableStateOf<Set<String>>(emptySet()) }
     var isRefreshing by remember { mutableStateOf(false) }
     var githubConfig by remember { mutableStateOf<GitHubConfig?>(null) }
+
 
     val releaseRepository = remember { RepositoryProvider.getReleaseRepository() }
     val workflowRepository = remember { RepositoryProvider.getWorkflowRepository() }
@@ -59,7 +61,6 @@ fun ReleaseDetailScreen(
                     githubConfigResult.fold(
                         onSuccess = { config ->
                             githubConfig = config
-                            println("✅ GitHub config loaded: ${config != null}")
                         },
                         onFailure = { error ->
                             println("⚠️ Could not load GitHub config: ${error.message}")
@@ -93,6 +94,7 @@ fun ReleaseDetailScreen(
     LaunchedEffect(releaseId) {
         try {
             workflowRepository.observeWorkflowSteps(releaseId).collect { stepsList ->
+                println("🔄 Firebase observer updating workflow steps")
                 workflowSteps = stepsList
             }
         } catch (e: Exception) {
@@ -143,6 +145,41 @@ fun ReleaseDetailScreen(
                             Text(
                                 text = "Dismiss",
                                 color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+            
+            // Success message display
+            successMessage?.let { success ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = success,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            onClick = { successMessage = null }
+                        ) {
+                            Text(
+                                text = "Dismiss",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
                     }
@@ -239,6 +276,10 @@ fun ReleaseDetailScreen(
                                 loadingSteps = loadingSteps + stepId
                                 isRefreshing = true
                                 
+                                // Clear previous messages
+                                errorMessage = null
+                                successMessage = null
+                                
                                 val currentUser = authRepository.getCurrentUser()
                                 val completedBy = currentUser?.email ?: ""
                                 
@@ -269,29 +310,6 @@ fun ReleaseDetailScreen(
                                     "start" -> {
                                         delay(300) // Small delay to show loading state
                                         
-                                        // Check if this is a GitHub step and we have config
-                                        val currentStep = workflowSteps.find { it.id == stepId }
-                                        if (currentStep != null && githubWorkflowService.isGitHubStep(currentStep) && githubConfig != null && release != null) {
-                                            // Create GitHub PR for this step
-                                            val prResult = githubWorkflowService.createPullRequestForStep(
-                                                step = currentStep,
-                                                release = release!!,
-                                                githubConfig = githubConfig!!
-                                            )
-                                            prResult.fold(
-                                                onSuccess = { updatedStep ->
-                                                    // Update the step list with PR information
-                                                    workflowSteps = workflowSteps.map { step ->
-                                                        if (step.id == stepId) updatedStep else step
-                                                    }
-                                                    println("✅ GitHub PR created for step: ${updatedStep.githubPrUrl}")
-                                                },
-                                                onFailure = { error ->
-                                                    errorMessage = "Failed to create GitHub PR: ${error.message}"
-                                                }
-                                            )
-                                        }
-                                        
                                         val result = RepositoryProvider.getWorkflowRepository()
                                             .updateStepStatus(stepId, StepStatus.IN_PROGRESS, completedBy, null)
                                         if (result.isFailure) {
@@ -303,6 +321,92 @@ fun ReleaseDetailScreen(
                                                 }
                                             }
                                             errorMessage = "Failed to start step: ${result.exceptionOrNull()?.message}"
+                                        }
+                                    }
+                                                                        "create_pr" -> {
+                                        delay(300) // Small delay to show loading state
+                                        
+                                        val currentStep = workflowSteps.find { it.id == stepId }
+                                        if (currentStep != null && githubConfig != null && release != null) {
+                                            // Check if repositoryType is missing and fix it
+                                            val stepWithRepoType = if (currentStep.repositoryType.isEmpty()) {
+                                                val repoType = when (currentStep.stepNumber) {
+                                                    2 -> "app"
+                                                    3 -> "bff"
+                                                    else -> ""
+                                                }
+                                                if (repoType.isNotEmpty()) {
+                                                    println("🔧 Fixing missing repositoryType for step ${currentStep.stepNumber}: setting to '$repoType'")
+                                                    val updatedStep = currentStep.copy(
+                                                        repositoryType = repoType,
+                                                        sourceBranch = "develop",
+                                                        targetBranch = "release"
+                                                    )
+                                                    // Update in database
+                                                    workflowRepository.updateWorkflowStep(updatedStep)
+                                                    // Update local list
+                                                    workflowSteps = workflowSteps.map { step ->
+                                                        if (step.id == stepId) updatedStep else step
+                                                    }
+                                                    updatedStep
+                                                } else {
+                                                    currentStep
+                                                }
+                                            } else {
+                                                currentStep
+                                            }
+                                            
+                                            // Check if this is a develop to release PR step
+                                            if (githubWorkflowService.isDevelopToReleasePRStep(stepWithRepoType)) {
+                                                println("🚀 Creating PR for step ${stepWithRepoType.stepNumber} (${stepWithRepoType.repositoryType})")
+                                                println("   - Step: ${stepWithRepoType.title}")
+                                                println("   - Repository Type: '${stepWithRepoType.repositoryType}'")
+                                                println("   - Source Branch: '${stepWithRepoType.sourceBranch}'")
+                                                println("   - Target Branch: '${stepWithRepoType.targetBranch}'")
+                                                
+                                                val prResult = githubWorkflowService.createDevelopToReleasePR(
+                                                    step = stepWithRepoType,
+                                                    release = release!!,
+                                                    githubConfig = githubConfig!!
+                                                )
+                                                prResult.fold(
+                                                    onSuccess = { updatedStep ->
+                                                        println("🎉 PR Creation Success!")
+                                                        println("   - PR Number: ${updatedStep.githubPrNumber}")
+                                                        println("   - PR URL: '${updatedStep.githubPrUrl}'")
+                                                        println("   - PR State: '${updatedStep.githubPrState}'")
+                                                        
+                                                        // Update the step list with PR information
+                                                        workflowSteps = workflowSteps.map { step ->
+                                                            if (step.id == stepId) {
+                                                                println("🔄 Updating step ${step.stepNumber} with PR info")
+                                                                updatedStep
+                                                            } else step
+                                                        }
+                                                        
+                                                        // Verify the update worked
+                                                        val updatedStepInList = workflowSteps.find { it.id == stepId }
+                                                        println("🔍 Verification - Step in list after update:")
+                                                        println("   - githubPrUrl: '${updatedStepInList?.githubPrUrl}'")
+                                                        println("   - githubPrNumber: ${updatedStepInList?.githubPrNumber}")
+                                                        
+                                                        println("✅ GitHub PR created for step: ${updatedStep.githubPrUrl}")
+                                                        successMessage = "✅ GitHub PR created successfully! PR #${updatedStep.githubPrNumber}"
+                                                    },
+                                                    onFailure = { error ->
+                                                        println("❌ PR Creation Failed: ${error.message}")
+                                                        errorMessage = "Failed to create GitHub PR: ${error.message}"
+                                                    }
+                                                )
+                                            } else {
+                                                errorMessage = "❌ Cannot create PR: Step ${currentStep.stepNumber} is not configured for PR creation. Repository type: '${stepWithRepoType.repositoryType}'"
+                                            }
+                                        } else {
+                                            val missingItems = mutableListOf<String>()
+                                            if (currentStep == null) missingItems.add("workflow step")
+                                            if (githubConfig == null) missingItems.add("GitHub configuration")
+                                            if (release == null) missingItems.add("release information")
+                                            errorMessage = "❌ Cannot create PR: Missing ${missingItems.joinToString(", ")}. Please configure GitHub settings first."
                                         }
                                     }
                                     "complete" -> {
@@ -350,40 +454,22 @@ fun ReleaseDetailScreen(
                                             errorMessage = "Failed to retry step: ${result.exceptionOrNull()?.message}"
                                         }
                                     }
-                                    "open_external" -> {
-                                        val step = workflowSteps.find { it.id == stepId }
-                                        step?.actionUrl?.let { url ->
-                                            // TODO: Open external URL in browser
-                                            println("Opening external URL: $url")
-                                        }
-                                    }
+
                                     "view_github_pr" -> {
                                         val step = workflowSteps.find { it.id == stepId }
                                         step?.githubPrUrl?.let { url ->
-                                            // TODO: Open GitHub PR in browser
-                                            println("Opening GitHub PR: $url")
+                                            println("🔗 Opening GitHub PR: $url")
+                                            try {
+                                                // Use platform-specific URL opening
+                                                com.rapido.rocket.util.openUrl(url)
+                                                successMessage = "✅ Opened GitHub PR in new tab"
+                                            } catch (e: Exception) {
+                                                println("❌ Failed to open GitHub PR: ${e.message}")
+                                                successMessage = "GitHub PR URL: $url (Copy and open in browser)"
+                                            }
                                         }
                                     }
-                                    "check_pr_status" -> {
-                                        val currentStep = workflowSteps.find { it.id == stepId }
-                                        if (currentStep != null && githubConfig != null) {
-                                            val statusResult = githubWorkflowService.checkPullRequestStatus(
-                                                step = currentStep,
-                                                githubConfig = githubConfig!!
-                                            )
-                                            statusResult.fold(
-                                                onSuccess = { updatedStep ->
-                                                    workflowSteps = workflowSteps.map { step ->
-                                                        if (step.id == stepId) updatedStep else step
-                                                    }
-                                                    println("✅ PR status updated: ${updatedStep.githubPrState}")
-                                                },
-                                                onFailure = { error ->
-                                                    errorMessage = "Failed to check PR status: ${error.message}"
-                                                }
-                                            )
-                                        }
-                                    }
+
                                 }
                             } catch (e: Exception) {
                                 errorMessage = "Error updating step: ${e.message}"
@@ -751,6 +837,19 @@ private fun WorkflowStepCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             
+            // Additional guidance for PR steps
+            if ((step.stepNumber == 2 || step.stepNumber == 3) && 
+                step.status == StepStatus.PENDING && 
+                canStartStep(step, allSteps)) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "💡 Click 'Start' first, then you'll see the 'Create PR' button",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+            
             Spacer(modifier = Modifier.height(12.dp))
             
             // Step details
@@ -800,6 +899,7 @@ private fun WorkflowStepCard(
             
             // GitHub PR Information
             if (step.githubPrUrl.isNotEmpty()) {
+                println("📋 Showing PR info card for step ${step.stepNumber} (PR URL: '${step.githubPrUrl}', PR #${step.githubPrNumber})")
                 Spacer(modifier = Modifier.height(8.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -847,6 +947,8 @@ private fun WorkflowStepCard(
                         }
                     }
                 }
+            } else {
+                println("❌ NOT showing PR info card for step ${step.stepNumber} (PR URL: '${step.githubPrUrl}')")
             }
             
             // Action buttons
@@ -903,6 +1005,35 @@ private fun WorkflowStepCard(
                             }
                         }
                         StepStatus.IN_PROGRESS -> {
+                            // Show Create PR button for develop to release steps (2 and 3) if no PR exists
+                            if ((step.stepNumber == 2 || step.stepNumber == 3) && 
+                                step.githubPrUrl.isEmpty()) {
+                                println("🔘 Showing Create PR button for step ${step.stepNumber} (PR URL: '${step.githubPrUrl}')")
+                                Button(
+                                    onClick = { onAction("create_pr") },
+                                    modifier = Modifier.height(32.dp),
+                                    enabled = !isStepLoading
+                                ) {
+                                    if (isStepLoading) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(14.dp),
+                                                strokeWidth = 2.dp,
+                                                color = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                            Text("Creating PR...", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    } else {
+                                        Text("🔀 Create PR", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            } else if ((step.stepNumber == 2 || step.stepNumber == 3)) {
+                                println("🔗 NOT showing Create PR button for step ${step.stepNumber} (PR URL: '${step.githubPrUrl}')")
+                            }
+                            
                             Button(
                                 onClick = { onAction("complete") },
                                 modifier = Modifier.height(32.dp),
@@ -972,35 +1103,18 @@ private fun WorkflowStepCard(
                         else -> {}
                     }
                     
-                    if (step.actionUrl.isNotEmpty()) {
-                        OutlinedButton(
-                            onClick = { onAction("open_external") },
-                            modifier = Modifier.height(32.dp),
-                            enabled = !isStepLoading
-                        ) {
-                            Text("Open Link", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                    
                     // GitHub PR buttons
                     if (step.githubPrUrl.isNotEmpty()) {
+                        println("🔗 Showing View PR button for step ${step.stepNumber} (PR URL: '${step.githubPrUrl}')")
                         OutlinedButton(
                             onClick = { onAction("view_github_pr") },
                             modifier = Modifier.height(32.dp),
                             enabled = !isStepLoading
                         ) {
-                            Text("View PR", style = MaterialTheme.typography.labelSmall)
+                            Text("🔗 View PR", style = MaterialTheme.typography.labelSmall)
                         }
-                        
-                        if (step.githubPrState == "open") {
-                            OutlinedButton(
-                                onClick = { onAction("check_pr_status") },
-                                modifier = Modifier.height(32.dp),
-                                enabled = !isStepLoading
-                            ) {
-                                Text("Check Status", style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
+                    } else {
+                        println("❌ NOT showing View PR button for step ${step.stepNumber} (PR URL: '${step.githubPrUrl}')")
                     }
                 }
             }

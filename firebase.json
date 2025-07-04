@@ -1,4 +1,25 @@
 {
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default"
+    },
+    {
+      "source": "rocket",
+      "codebase": "rocket",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ],
   "hosting": {
     "public": "composeApp/build/kotlin-webpack/wasmJs/productionExecutable",
     "ignore": [
@@ -6,7 +27,28 @@
       "**/.*",
       "**/node_modules/**"
     ],
-
+    "rewrites": [
+      {
+        "source": "/api/validateGitHubToken",
+        "function": "validateGitHubToken"
+      },
+      {
+        "source": "/api/validateGitHubRepository",
+        "function": "validateGitHubRepository"
+      },
+      {
+        "source": "/api/createGitHubPullRequest",
+        "function": "createGitHubPullRequest"
+      },
+      {
+        "source": "/api/getGitHubPullRequest",
+        "function": "getGitHubPullRequest"
+      },
+      {
+        "source": "/api/mergeGitHubPullRequest",
+        "function": "mergeGitHubPullRequest"
+      }
+    ],
     "headers": [
       {
         "source": "**/*.wasm",

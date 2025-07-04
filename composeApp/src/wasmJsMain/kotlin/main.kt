@@ -63,8 +63,11 @@ fun main() {
             initializeApp()
         } else {
             Console.log("Document not ready, setting up load listener...")
-            window.addEventListener("DOMContentLoaded", { initializeApp() })
-            window.addEventListener("load", { initializeApp() })
+            // Use only DOMContentLoaded to avoid duplicate calls
+            window.addEventListener("DOMContentLoaded", { 
+                Console.log("DOMContentLoaded event fired")
+                initializeApp() 
+            })
         }
     } catch (e: Throwable) {
         Console.error("Failed in main initialization", e as JsAny)

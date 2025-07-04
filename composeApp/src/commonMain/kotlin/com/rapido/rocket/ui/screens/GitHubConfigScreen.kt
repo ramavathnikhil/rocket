@@ -12,6 +12,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rapido.rocket.model.GitHubConfig
+import com.rapido.rocket.model.WorkflowStepType
 import com.rapido.rocket.repository.FirebaseAuthRepository
 import com.rapido.rocket.repository.RepositoryProvider
 import com.rapido.rocket.util.currentTimeMillis
@@ -36,6 +37,7 @@ fun GitHubConfigScreen(
     var appRepositoryUrl by remember { mutableStateOf("") }
     var bffRepositoryUrl by remember { mutableStateOf("") }
     var githubToken by remember { mutableStateOf("") }
+    var workflowIds by remember { mutableStateOf(mutableMapOf<String, String>()) }
     var defaultBaseBranch by remember { mutableStateOf("develop") }
     var defaultTargetBranch by remember { mutableStateOf("release") }
     var showToken by remember { mutableStateOf(false) }
@@ -58,6 +60,7 @@ fun GitHubConfigScreen(
                         appRepositoryUrl = it.appRepositoryUrl
                         bffRepositoryUrl = it.bffRepositoryUrl
                         githubToken = it.githubToken
+                        workflowIds = it.workflowIds.toMutableMap()
                         defaultBaseBranch = it.defaultBaseBranch
                         defaultTargetBranch = it.defaultTargetBranch
                     }
@@ -256,6 +259,49 @@ fun GitHubConfigScreen(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
+                // Workflow Configuration Section
+                Text(
+                    text = "GitHub Actions Workflow Configuration",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Configure workflow IDs for build automation steps",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Workflow ID fields for each supported step type
+                GitHubConfig.getSupportedWorkflowStepTypes().forEach { stepType ->
+                    OutlinedTextField(
+                        value = workflowIds[stepType.key] ?: "",
+                        onValueChange = { newValue ->
+                            workflowIds = workflowIds.toMutableMap().apply {
+                                if (newValue.isEmpty()) {
+                                    remove(stepType.key)
+                                } else {
+                                    put(stepType.key, newValue)
+                                }
+                            }
+                        },
+                        label = { Text(stepType.displayName) },
+                        placeholder = { Text("e.g., 123456789") },
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = {
+                            Text(stepType.description)
+                        }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 // Branch Configuration
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -278,82 +324,144 @@ fun GitHubConfigScreen(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                // Validation Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
+                // Test Firebase Functions Button
+                Button(
+                    onClick = {
+                        println("[DEBUG] Test Firebase Functions button clicked")
+                        scope.launch {
+                            try {
                                 isValidatingToken = true
+                                errorMessage = null
+                                successMessage = null
+                                
+                                println("[DEBUG] Starting token validation with Firebase Functions SDK...")
                                 val result = githubRepository.validateToken(githubToken)
+                                
+                                println("[DEBUG] Validation result received")
                                 result.fold(
                                     onSuccess = { isValid ->
+                                        println("[DEBUG] Validation successful: $isValid")
                                         if (isValid) {
-                                            successMessage = "Token is valid"
+                                            successMessage = "✅ Token is valid! Firebase Functions working correctly."
                                         } else {
-                                            errorMessage = "Invalid token"
+                                            errorMessage = "❌ Token is invalid"
                                         }
                                     },
                                     onFailure = { error ->
-                                        errorMessage = "Token validation failed: ${error.message}"
+                                        println("[DEBUG] Validation failed: ${error.message}")
+                                        errorMessage = "❌ Token validation failed: ${error.message}"
                                     }
                                 )
+                            } catch (e: Exception) {
+                                println("[DEBUG] Exception during validation: ${e.message}")
+                                errorMessage = "❌ Exception: ${e.message}"
+                            } finally {
                                 isValidatingToken = false
                             }
-                        },
-                        enabled = githubToken.isNotEmpty() && !isValidatingToken,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Validate Token")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = githubToken.isNotEmpty() && !isValidatingToken
+                ) {
+                    if (isValidatingToken) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text("Testing Firebase Functions...")
+                        }
+                    } else {
+                        Text("🔥 Test Firebase Functions")
                     }
-                    
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Repository Validation Button
+                Button(
+                    onClick = {
+                        println("[DEBUG] Repository validation button clicked")
+                        scope.launch {
+                            try {
                                 if (appRepositoryUrl.isNotEmpty()) {
                                     isValidatingAppRepo = true
+                                    errorMessage = null
+                                    successMessage = null
+                                    
+                                    println("[DEBUG] Validating app repository: $appRepositoryUrl")
                                     val result = githubRepository.validateRepository(appRepositoryUrl, githubToken)
+                                    
                                     result.fold(
                                         onSuccess = { isValid ->
+                                            println("[DEBUG] App repo validation successful: $isValid")
                                             if (isValid) {
-                                                successMessage = "App repository is accessible"
+                                                successMessage = "✅ App repository is accessible"
                                             } else {
-                                                errorMessage = "Cannot access app repository"
+                                                errorMessage = "❌ Cannot access app repository"
                                             }
                                         },
                                         onFailure = { error ->
-                                            errorMessage = "App repository validation failed: ${error.message}"
+                                            println("[DEBUG] App repo validation failed: ${error.message}")
+                                            errorMessage = "❌ App repository validation failed: ${error.message}"
                                         }
                                     )
-                                    isValidatingAppRepo = false
                                 }
                                 
                                 if (bffRepositoryUrl.isNotEmpty()) {
                                     isValidatingBffRepo = true
+                                    
+                                    println("[DEBUG] Validating BFF repository: $bffRepositoryUrl")
                                     val result = githubRepository.validateRepository(bffRepositoryUrl, githubToken)
+                                    
                                     result.fold(
                                         onSuccess = { isValid ->
+                                            println("[DEBUG] BFF repo validation successful: $isValid")
                                             if (isValid) {
-                                                successMessage = "BFF repository is accessible"
+                                                if (successMessage.isNullOrEmpty()) {
+                                                    successMessage = "✅ BFF repository is accessible"
+                                                } else {
+                                                    successMessage += " • BFF repository is accessible"
+                                                }
                                             } else {
-                                                errorMessage = "Cannot access BFF repository"
+                                                errorMessage = "❌ Cannot access BFF repository"
                                             }
                                         },
                                         onFailure = { error ->
-                                            errorMessage = "BFF repository validation failed: ${error.message}"
+                                            println("[DEBUG] BFF repo validation failed: ${error.message}")
+                                            errorMessage = "❌ BFF repository validation failed: ${error.message}"
                                         }
                                     )
-                                    isValidatingBffRepo = false
                                 }
+                            } catch (e: Exception) {
+                                println("[DEBUG] Exception during repository validation: ${e.message}")
+                                errorMessage = "❌ Repository validation exception: ${e.message}"
+                            } finally {
+                                isValidatingAppRepo = false
+                                isValidatingBffRepo = false
                             }
-                        },
-                        enabled = (appRepositoryUrl.isNotEmpty() || bffRepositoryUrl.isNotEmpty()) && 
-                                githubToken.isNotEmpty() && !isValidatingAppRepo && !isValidatingBffRepo,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Validate Repos")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = (appRepositoryUrl.isNotEmpty() || bffRepositoryUrl.isNotEmpty()) && 
+                            githubToken.isNotEmpty() && !isValidatingAppRepo && !isValidatingBffRepo
+                ) {
+                    if (isValidatingAppRepo || isValidatingBffRepo) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text("Validating Repositories...")
+                        }
+                    } else {
+                        Text("📂 Validate Repositories")
                     }
                 }
                 
@@ -367,10 +475,19 @@ fun GitHubConfigScreen(
                                 isSaving = true
                                 val currentUser = authRepository.getCurrentUser()
                                 
+                                println("🔍 Preparing to save GitHub config:")
+                                println("   - Form appRepositoryUrl: '$appRepositoryUrl'")
+                                println("   - Form bffRepositoryUrl: '$bffRepositoryUrl'")
+                                println("   - Form githubToken length: ${githubToken.length}")
+                                println("   - Form workflowIds: $workflowIds")
+                                println("   - Form defaultBaseBranch: '$defaultBaseBranch'")
+                                println("   - Form defaultTargetBranch: '$defaultTargetBranch'")
+                                
                                 val configToSave = githubConfig?.copy(
                                     appRepositoryUrl = appRepositoryUrl,
                                     bffRepositoryUrl = bffRepositoryUrl,
                                     githubToken = githubToken,
+                                    workflowIds = workflowIds.toMap(),
                                     defaultBaseBranch = defaultBaseBranch,
                                     defaultTargetBranch = defaultTargetBranch,
                                     updatedAt = currentTimeMillis()
@@ -379,11 +496,19 @@ fun GitHubConfigScreen(
                                     appRepositoryUrl = appRepositoryUrl,
                                     bffRepositoryUrl = bffRepositoryUrl,
                                     githubToken = githubToken,
+                                    workflowIds = workflowIds.toMap(),
                                     defaultBaseBranch = defaultBaseBranch,
                                     defaultTargetBranch = defaultTargetBranch,
                                     createdAt = currentTimeMillis(),
                                     updatedAt = currentTimeMillis()
                                 )
+                                
+                                println("🔍 Final config to save:")
+                                println("   - projectId: '${configToSave.projectId}'")
+                                println("   - appRepositoryUrl: '${configToSave.appRepositoryUrl}'")
+                                println("   - bffRepositoryUrl: '${configToSave.bffRepositoryUrl}'")
+                                println("   - githubToken length: ${configToSave.githubToken.length}")
+                                println("   - workflowIds: ${configToSave.workflowIds}")
                                 
                                 val result = githubRepository.saveGitHubConfig(configToSave)
                                 result.fold(
@@ -445,11 +570,14 @@ fun GitHubConfigScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "• Personal Access Token needs 'repo' permissions\n" +
+                    text = "• Personal Access Token needs 'repo' and 'actions' permissions\n" +
                           "• Repository URLs should be in 'owner/repository' format\n" +
                           "• Base branch is typically 'develop' or 'main'\n" +
                           "• Target branch is typically 'release' or 'staging'\n" +
-                          "• This enables automatic PR creation in workflow steps",
+                          "• Workflow IDs are numeric IDs from GitHub Actions URLs\n" +
+                          "• Find workflow ID in: github.com/owner/repo/actions/workflows/ID\n" +
+                          "• Configure different workflows for different build steps\n" +
+                          "• This enables automatic PR creation and build triggers",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
