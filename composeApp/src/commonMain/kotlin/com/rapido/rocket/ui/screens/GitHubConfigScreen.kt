@@ -12,6 +12,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.rapido.rocket.model.GitHubConfig
+import com.rapido.rocket.model.WorkflowStepType
 import com.rapido.rocket.repository.FirebaseAuthRepository
 import com.rapido.rocket.repository.RepositoryProvider
 import com.rapido.rocket.util.currentTimeMillis
@@ -36,6 +37,7 @@ fun GitHubConfigScreen(
     var appRepositoryUrl by remember { mutableStateOf("") }
     var bffRepositoryUrl by remember { mutableStateOf("") }
     var githubToken by remember { mutableStateOf("") }
+    var workflowIds by remember { mutableStateOf(mutableMapOf<String, String>()) }
     var defaultBaseBranch by remember { mutableStateOf("develop") }
     var defaultTargetBranch by remember { mutableStateOf("release") }
     var showToken by remember { mutableStateOf(false) }
@@ -58,6 +60,7 @@ fun GitHubConfigScreen(
                         appRepositoryUrl = it.appRepositoryUrl
                         bffRepositoryUrl = it.bffRepositoryUrl
                         githubToken = it.githubToken
+                        workflowIds = it.workflowIds.toMutableMap()
                         defaultBaseBranch = it.defaultBaseBranch
                         defaultTargetBranch = it.defaultTargetBranch
                     }
@@ -256,6 +259,49 @@ fun GitHubConfigScreen(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
+                // Workflow Configuration Section
+                Text(
+                    text = "GitHub Actions Workflow Configuration",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Configure workflow IDs for build automation steps",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Workflow ID fields for each supported step type
+                GitHubConfig.getSupportedWorkflowStepTypes().forEach { stepType ->
+                    OutlinedTextField(
+                        value = workflowIds[stepType.key] ?: "",
+                        onValueChange = { newValue ->
+                            workflowIds = workflowIds.toMutableMap().apply {
+                                if (newValue.isEmpty()) {
+                                    remove(stepType.key)
+                                } else {
+                                    put(stepType.key, newValue)
+                                }
+                            }
+                        },
+                        label = { Text(stepType.displayName) },
+                        placeholder = { Text("e.g., 123456789") },
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = {
+                            Text(stepType.description)
+                        }
+                    )
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 // Branch Configuration
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -433,6 +479,7 @@ fun GitHubConfigScreen(
                                 println("   - Form appRepositoryUrl: '$appRepositoryUrl'")
                                 println("   - Form bffRepositoryUrl: '$bffRepositoryUrl'")
                                 println("   - Form githubToken length: ${githubToken.length}")
+                                println("   - Form workflowIds: $workflowIds")
                                 println("   - Form defaultBaseBranch: '$defaultBaseBranch'")
                                 println("   - Form defaultTargetBranch: '$defaultTargetBranch'")
                                 
@@ -440,6 +487,7 @@ fun GitHubConfigScreen(
                                     appRepositoryUrl = appRepositoryUrl,
                                     bffRepositoryUrl = bffRepositoryUrl,
                                     githubToken = githubToken,
+                                    workflowIds = workflowIds.toMap(),
                                     defaultBaseBranch = defaultBaseBranch,
                                     defaultTargetBranch = defaultTargetBranch,
                                     updatedAt = currentTimeMillis()
@@ -448,6 +496,7 @@ fun GitHubConfigScreen(
                                     appRepositoryUrl = appRepositoryUrl,
                                     bffRepositoryUrl = bffRepositoryUrl,
                                     githubToken = githubToken,
+                                    workflowIds = workflowIds.toMap(),
                                     defaultBaseBranch = defaultBaseBranch,
                                     defaultTargetBranch = defaultTargetBranch,
                                     createdAt = currentTimeMillis(),
@@ -459,6 +508,7 @@ fun GitHubConfigScreen(
                                 println("   - appRepositoryUrl: '${configToSave.appRepositoryUrl}'")
                                 println("   - bffRepositoryUrl: '${configToSave.bffRepositoryUrl}'")
                                 println("   - githubToken length: ${configToSave.githubToken.length}")
+                                println("   - workflowIds: ${configToSave.workflowIds}")
                                 
                                 val result = githubRepository.saveGitHubConfig(configToSave)
                                 result.fold(
@@ -520,11 +570,14 @@ fun GitHubConfigScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "• Personal Access Token needs 'repo' permissions\n" +
+                    text = "• Personal Access Token needs 'repo' and 'actions' permissions\n" +
                           "• Repository URLs should be in 'owner/repository' format\n" +
                           "• Base branch is typically 'develop' or 'main'\n" +
                           "• Target branch is typically 'release' or 'staging'\n" +
-                          "• This enables automatic PR creation in workflow steps",
+                          "• Workflow IDs are numeric IDs from GitHub Actions URLs\n" +
+                          "• Find workflow ID in: github.com/owner/repo/actions/workflows/ID\n" +
+                          "• Configure different workflows for different build steps\n" +
+                          "• This enables automatic PR creation and build triggers",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

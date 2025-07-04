@@ -4,11 +4,40 @@ import com.rapido.rocket.model.WorkflowStep
 import com.rapido.rocket.model.GitHubConfig
 import com.rapido.rocket.model.CreatePullRequestRequest
 import com.rapido.rocket.model.Release
+import com.rapido.rocket.model.StepType
 
 class GitHubWorkflowService(
     private val githubRepository: GitHubRepository,
     private val workflowRepository: WorkflowRepository
 ) {
+    
+    /**
+     * Check if this is a build step that can trigger GitHub Actions
+     */
+    fun isBuildStep(step: WorkflowStep): Boolean {
+        return when (step.type) {
+            StepType.SHARE_FUNCTIONAL_BUILD,
+            StepType.SHARE_REGRESSION_BUILD,
+            StepType.SHARE_PROD_REGRESSION_BUILD,
+            StepType.BUILD_STAGING,
+            StepType.BUILD_PRODUCTION -> true
+            else -> false
+        }
+    }
+    
+    /**
+     * Get workflow ID for a specific step type from GitHub config
+     */
+    fun getWorkflowIdForStep(step: WorkflowStep, githubConfig: GitHubConfig): String? {
+        return githubConfig.workflowIds[step.type.name]
+    }
+    
+    /**
+     * Check if workflow is configured for a specific step
+     */
+    fun isWorkflowConfiguredForStep(step: WorkflowStep, githubConfig: GitHubConfig): Boolean {
+        return isBuildStep(step) && getWorkflowIdForStep(step, githubConfig) != null
+    }
     
     /**
      * Check if this is a develop to release PR step (step 2 or 3)

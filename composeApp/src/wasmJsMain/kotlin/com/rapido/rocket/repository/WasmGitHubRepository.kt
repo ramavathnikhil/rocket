@@ -268,6 +268,7 @@ class WasmGitHubRepository : GitHubRepository {
             println("   - appRepositoryUrl: '${config.appRepositoryUrl}'")
             println("   - bffRepositoryUrl: '${config.bffRepositoryUrl}'")
             println("   - githubToken length: ${config.githubToken.length}")
+            println("   - workflowIds: ${config.workflowIds}")
             
             val configWithId = if (config.id.isEmpty()) {
                 config.copy(
@@ -279,10 +280,31 @@ class WasmGitHubRepository : GitHubRepository {
                 config.copy(updatedAt = currentTimeMillis())
             }
             
-            val configDataMap = configWithId.toMap()
+            // Create the config data map, handling workflowIds properly for Firebase
+            val configDataMap = mutableMapOf<String, Any>(
+                "id" to configWithId.id,
+                "projectId" to configWithId.projectId,
+                "appRepositoryUrl" to configWithId.appRepositoryUrl,
+                "bffRepositoryUrl" to configWithId.bffRepositoryUrl,
+                "githubToken" to configWithId.githubToken,
+                "defaultBaseBranch" to configWithId.defaultBaseBranch,
+                "defaultTargetBranch" to configWithId.defaultTargetBranch,
+                "createdAt" to configWithId.createdAt,
+                "updatedAt" to configWithId.updatedAt
+            )
+            
+            // Handle workflowIds as a proper nested map for Firebase
+            if (configWithId.workflowIds.isNotEmpty()) {
+                configDataMap["workflowIds"] = configWithId.workflowIds
+            }
+            
             println("🔍 Config data map before saving:")
             configDataMap.forEach { (key, value) ->
-                println("   - $key: '$value'")
+                if (key == "workflowIds") {
+                    println("   - $key: $value (${value::class.simpleName})")
+                } else {
+                    println("   - $key: '$value'")
+                }
             }
             
             val jsConfigData = configDataMap.toJsObject()

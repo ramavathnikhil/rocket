@@ -167,27 +167,8 @@
             console.log('Development mode detected');
         }
         
-        // Load the appropriate bundle
-        if (isProduction) {
-            // Production: Load UMD bundle
-            const script = document.createElement('script');
-            script.src = 'composeApp.js';
-            script.onload = function() {
-                console.log('WASM bundle loaded successfully');
-            };
-            script.onerror = function() {
-                console.error('Failed to load WASM bundle');
-                document.getElementById('loading-content').innerHTML = 
-                    '<div class="error">Failed to load application. Please refresh the page.</div>';
-            };
-            document.body.appendChild(script);
-        } else {
-            // Development: Load ES module
-            const script = document.createElement('script');
-            script.type = 'module';
-            script.src = 'composeApp.js';
-            document.body.appendChild(script);
-        }
+        // Don't load scripts dynamically - they're loaded statically below
+        console.log('Scripts will be loaded statically');
     </script>
     <script>
         // Define multiple CDN sources for each Firebase package
@@ -300,9 +281,8 @@
             initializeFirebase().catch(console.error);
         });
     </script>
-    <!-- Load composeApp.js early to ensure JS glue is available -->
+    <!-- Load composeApp.js and WASM module statically -->
     <script src="composeApp.js"></script>
-    <!-- Your WASM/Kotlin loader should be loaded after composeApp.js -->
     <script src="composeApp.uninstantiated.mjs"></script>
     <!-- Add a debug script to check if validateGitHubToken is available -->
     <script>
