@@ -2,6 +2,7 @@ package com.rapido.rocket.repository
 
 import com.rapido.rocket.model.GitHubConfig
 import com.rapido.rocket.model.GitHubPullRequest
+import com.rapido.rocket.model.GitHubActionRun
 import com.rapido.rocket.model.CreatePullRequestRequest
 
 interface GitHubRepository {
@@ -23,6 +24,14 @@ interface GitHubRepository {
         pullNumber: Int,
         mergeMethod: String = "merge" // "merge", "squash", "rebase"
     ): Result<GitHubPullRequest>
+    
+    suspend fun triggerGitHubAction(
+        repositoryUrl: String,
+        token: String,
+        workflowId: String,
+        ref: String = "release",
+        inputs: Map<String, String> = emptyMap()
+    ): Result<GitHubActionRun>
     
     suspend fun saveGitHubConfig(config: GitHubConfig): Result<GitHubConfig>
     suspend fun getGitHubConfig(projectId: String): Result<GitHubConfig?>

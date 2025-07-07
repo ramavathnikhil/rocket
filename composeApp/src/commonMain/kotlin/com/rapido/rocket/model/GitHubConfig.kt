@@ -8,7 +8,7 @@ data class GitHubConfig(
     val githubToken: String = "", // GitHub personal access token or app token
     val defaultBaseBranch: String = "develop",
     val defaultTargetBranch: String = "release",
-    val workflowIds: Map<String, String> = emptyMap(), // Map of step type to workflow ID
+    val workflowUrls: Map<String, String> = emptyMap(), // Map of step type to workflow URL with inputs
     val createdAt: Long = 0L,
     val updatedAt: Long = 0L
 ) {
@@ -21,7 +21,7 @@ data class GitHubConfig(
             "githubToken" to githubToken,
             "defaultBaseBranch" to defaultBaseBranch,
             "defaultTargetBranch" to defaultTargetBranch,
-            "workflowIds" to workflowIds,
+            "workflowUrls" to workflowUrls,
             "createdAt" to createdAt,
             "updatedAt" to updatedAt
         )
@@ -29,37 +29,37 @@ data class GitHubConfig(
 
     companion object {
         fun fromMap(map: Map<String, Any>): GitHubConfig {
-            // Handle workflowIds properly - Firebase might store numbers as Number type or even as String
-            val workflowIds = mutableMapOf<String, String>()
-            val rawWorkflowIds = map["workflowIds"]
+            // Handle workflowUrls properly - Firebase might store this as a Map or String
+            val workflowUrls = mutableMapOf<String, String>()
+            val rawWorkflowUrls = map["workflowUrls"]
             
-            println("🔍 DEBUG: Processing workflowIds from Firebase:")
-            println("   - Raw value: '$rawWorkflowIds'")
-            println("   - Type: ${rawWorkflowIds?.let { it::class.simpleName }}")
+            println("🔍 DEBUG: Processing workflowUrls from Firebase:")
+            println("   - Raw value: '$rawWorkflowUrls'")
+            println("   - Type: ${rawWorkflowUrls?.let { it::class.simpleName }}")
             
-            when (rawWorkflowIds) {
+            when (rawWorkflowUrls) {
                 is Map<*, *> -> {
                     println("   - Processing as Map")
-                    rawWorkflowIds.forEach { (key, value) ->
+                    rawWorkflowUrls.forEach { (key, value) ->
                         if (key is String) {
-                            workflowIds[key] = value.toString()
+                            workflowUrls[key] = value.toString()
                             println("     - Added: $key = ${value.toString()}")
                         }
                     }
                 }
                 is String -> {
                     println("   - Processing as String (need to parse)")
-                    // Handle case where Firebase stored it as a string like "{SHARE_FUNCTIONAL_BUILD=172107435}"
-                    if (rawWorkflowIds.startsWith("{") && rawWorkflowIds.endsWith("}")) {
-                        val content = rawWorkflowIds.substring(1, rawWorkflowIds.length - 1)
+                    // Handle case where Firebase stored it as a string
+                    if (rawWorkflowUrls.startsWith("{") && rawWorkflowUrls.endsWith("}")) {
+                        val content = rawWorkflowUrls.substring(1, rawWorkflowUrls.length - 1)
                         if (content.isNotEmpty()) {
                             val entries = content.split(",").map { it.trim() }
                             entries.forEach { entry ->
-                                val parts = entry.split("=")
+                                val parts = entry.split("=", limit = 2)
                                 if (parts.size == 2) {
                                     val key = parts[0].trim()
                                     val value = parts[1].trim()
-                                    workflowIds[key] = value
+                                    workflowUrls[key] = value
                                     println("     - Parsed: $key = $value")
                                 }
                             }
@@ -71,7 +71,7 @@ data class GitHubConfig(
                 }
             }
             
-            println("   - Final workflowIds map: $workflowIds")
+            println("   - Final workflowUrls map: $workflowUrls")
             
             return GitHubConfig(
                 id = map["id"] as? String ?: "",
@@ -81,7 +81,7 @@ data class GitHubConfig(
                 githubToken = map["githubToken"] as? String ?: "",
                 defaultBaseBranch = map["defaultBaseBranch"] as? String ?: "develop",
                 defaultTargetBranch = map["defaultTargetBranch"] as? String ?: "release",
-                workflowIds = workflowIds,
+                workflowUrls = workflowUrls,
                 createdAt = map["createdAt"] as? Long ?: 0L,
                 updatedAt = map["updatedAt"] as? Long ?: 0L
             )
@@ -106,6 +106,86 @@ data class WorkflowStepType(
     val displayName: String,
     val description: String
 )
+
+// Data class to represent parsed workflow URL information
+data class WorkflowUrlInfo(
+    val repositoryUrl: String, // e.g., "owner/repo"
+    val workflowId: String,
+    val inputs: Map<String, String>
+) {
+    companion object {
+        /**
+         * Parse GitHub-style workflow URL
+         * Expected format: https://github.com/owner/repo/actions/workflows/123456789/dispatches?param1=value1&param2=value2
+         * Or simplified: owner/repo/123456789?param1=value1&param2=value2
+         */
+        fun fromUrl(url: String): WorkflowUrlInfo? {
+            return try {
+                val cleanUrl = url.trim()
+                println("🔍 Parsing workflow URL: '$cleanUrl'")
+                
+                // Handle both full GitHub URLs and simplified format
+                val workingUrl = if (cleanUrl.startsWith("https://github.com/")) {
+                    // Extract from full GitHub URL
+                    // https://github.com/owner/repo/actions/workflows/123456789/dispatches?param1=value1
+                    val afterGithub = cleanUrl.removePrefix("https://github.com/")
+                    val parts = afterGithub.split("/actions/workflows/")
+                    if (parts.size != 2) return null
+                    
+                    val repositoryUrl = parts[0]
+                    val workflowPart = parts[1].removeSuffix("/dispatches")
+                    
+                    // Split workflow ID and params
+                    val workflowParts = workflowPart.split("?", limit = 2)
+                    val workflowId = workflowParts[0]
+                    val params = if (workflowParts.size > 1) workflowParts[1] else ""
+                    
+                    "$repositoryUrl/$workflowId?$params"
+                } else {
+                    // Assume simplified format: owner/repo/123456789?param1=value1
+                    cleanUrl
+                }
+                
+                println("   - Working URL: '$workingUrl'")
+                
+                // Parse simplified format: owner/repo/123456789?param1=value1&param2=value2
+                val mainParts = workingUrl.split("?", limit = 2)
+                val pathPart = mainParts[0]
+                val queryPart = if (mainParts.size > 1) mainParts[1] else ""
+                
+                // Extract repository and workflow ID from path
+                val pathSegments = pathPart.split("/")
+                if (pathSegments.size < 3) return null
+                
+                val repositoryUrl = "${pathSegments[0]}/${pathSegments[1]}"
+                val workflowId = pathSegments[2]
+                
+                println("   - Repository: '$repositoryUrl'")
+                println("   - Workflow ID: '$workflowId'")
+                
+                // Parse query parameters
+                val inputs = mutableMapOf<String, String>()
+                if (queryPart.isNotEmpty()) {
+                    val params = queryPart.split("&")
+                    params.forEach { param ->
+                        val paramParts = param.split("=", limit = 2)
+                        if (paramParts.size == 2) {
+                            val key = paramParts[0].trim()
+                            val value = paramParts[1].trim()
+                            inputs[key] = value
+                            println("   - Input: $key = $value")
+                        }
+                    }
+                }
+                
+                WorkflowUrlInfo(repositoryUrl, workflowId, inputs)
+            } catch (e: Exception) {
+                println("❌ Failed to parse workflow URL: ${e.message}")
+                null
+            }
+        }
+    }
+}
 
 data class GitHubPullRequest(
     val id: Int = 0,
@@ -156,5 +236,37 @@ data class CreatePullRequestRequest(
             "base" to base,
             "draft" to draft
         )
+    }
+}
+
+data class GitHubActionRun(
+    val id: Long = 0,
+    val runNumber: Int = 0,
+    val status: String = "", // "queued", "in_progress", "completed"
+    val conclusion: String? = null, // "success", "failure", "cancelled", etc.
+    val htmlUrl: String = "",
+    val workflowId: Long = 0,
+    val headBranch: String = "",
+    val headSha: String = "",
+    val createdAt: String = "",
+    val updatedAt: String = "",
+    val triggeredBy: String = ""
+) {
+    companion object {
+        fun fromMap(map: Map<String, Any>): GitHubActionRun {
+            return GitHubActionRun(
+                id = (map["id"] as? Number)?.toLong() ?: 0,
+                runNumber = (map["runNumber"] as? Number)?.toInt() ?: 0,
+                status = map["status"] as? String ?: "",
+                conclusion = map["conclusion"] as? String,
+                htmlUrl = (map["htmlUrl"] as? String) ?: (map["html_url"] as? String) ?: "",
+                workflowId = (map["workflowId"] as? Number)?.toLong() ?: 0,
+                headBranch = (map["headBranch"] as? String) ?: (map["head_branch"] as? String) ?: "",
+                headSha = (map["headSha"] as? String) ?: (map["head_sha"] as? String) ?: "",
+                createdAt = (map["createdAt"] as? String) ?: (map["created_at"] as? String) ?: "",
+                updatedAt = (map["updatedAt"] as? String) ?: (map["updated_at"] as? String) ?: "",
+                triggeredBy = map["triggeredBy"] as? String ?: ""
+            )
+        }
     }
 } 

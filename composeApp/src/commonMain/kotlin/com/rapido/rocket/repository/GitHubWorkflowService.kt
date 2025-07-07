@@ -26,17 +26,18 @@ class GitHubWorkflowService(
     }
     
     /**
-     * Get workflow ID for a specific step type from GitHub config
+     * Get workflow URL info for a specific step type from GitHub config
      */
-    fun getWorkflowIdForStep(step: WorkflowStep, githubConfig: GitHubConfig): String? {
-        return githubConfig.workflowIds[step.type.name]
+    fun getWorkflowUrlInfoForStep(step: WorkflowStep, githubConfig: GitHubConfig): com.rapido.rocket.model.WorkflowUrlInfo? {
+        val workflowUrl = githubConfig.workflowUrls[step.type.name]
+        return workflowUrl?.let { com.rapido.rocket.model.WorkflowUrlInfo.fromUrl(it) }
     }
     
     /**
      * Check if workflow is configured for a specific step
      */
     fun isWorkflowConfiguredForStep(step: WorkflowStep, githubConfig: GitHubConfig): Boolean {
-        return isBuildStep(step) && getWorkflowIdForStep(step, githubConfig) != null
+        return isBuildStep(step) && getWorkflowUrlInfoForStep(step, githubConfig) != null
     }
     
     /**
@@ -308,5 +309,116 @@ class GitHubWorkflowService(
     suspend fun isGitHubStep(step: WorkflowStep): Boolean {
         return step.repositoryType.isNotEmpty() && 
                (step.type.name.contains("PR") || step.type == com.rapido.rocket.model.StepType.CREATE_PR_BFF)
+    }
+    
+    /**
+     * Process workflow inputs and replace placeholders with actual values
+     */
+    fun processWorkflowInputs(
+        rawInputs: Map<String, String>,
+        step: WorkflowStep,
+        release: Release
+    ): Map<String, String> {
+        val processedInputs = mutableMapOf<String, String>()
+        
+        rawInputs.forEach { (key, value) ->
+            // Replace placeholders with actual values
+            val processedValue = value
+                .replace("{{release.version}}", release.version)
+                .replace("{{release.title}}", release.title)
+                .replace("{{step.type}}", step.type.name)
+                .replace("{{step.title}}", step.title)
+                .replace("{{step.sourceBranch}}", step.sourceBranch)
+                .replace("{{step.targetBranch}}", step.targetBranch)
+                
+            processedInputs[key] = processedValue
+        }
+        
+        return processedInputs
+    }
+    
+    /**
+     * Trigger GitHub Action for a build step
+     */
+    suspend fun triggerBuildAction(
+        step: WorkflowStep,
+        release: Release,
+        githubConfig: GitHubConfig,
+        ref: String = "release"
+    ): Result<WorkflowStep> {
+        return try {
+            // Validate this is a build step
+            if (!isBuildStep(step)) {
+                return Result.failure(Exception("Step is not a build step: ${step.type}"))
+            }
+            
+            // Get workflow URL info for this step type
+            val workflowUrlInfo = getWorkflowUrlInfoForStep(step, githubConfig)
+                ?: return Result.failure(Exception("No workflow URL configured for step type: ${step.type}"))
+            
+            // Process the inputs from URL and replace placeholders
+            val processedInputs = processWorkflowInputs(workflowUrlInfo.inputs, step, release)
+            
+            // Extract branch from URL params or use default
+            val branchToTrigger = workflowUrlInfo.inputs["branch"] ?: ref
+            
+            // Remove branch from processed inputs as it's used for API call, not workflow input
+            val finalInputs = processedInputs.toMutableMap().apply {
+                remove("branch")
+            }
+            
+            println("🚀 Triggering GitHub Action for step:")
+            println("   - Step: ${step.title} (${step.type})")
+            println("   - Repository: ${workflowUrlInfo.repositoryUrl}")
+            println("   - Workflow ID: ${workflowUrlInfo.workflowId}")
+            println("   - Branch: $branchToTrigger")
+            println("   - Raw Inputs: ${workflowUrlInfo.inputs}")
+            println("   - Processed Inputs: $finalInputs")
+            
+            // Trigger the GitHub Action
+            val actionResult = githubRepository.triggerGitHubAction(
+                repositoryUrl = workflowUrlInfo.repositoryUrl,
+                token = githubConfig.githubToken,
+                workflowId = workflowUrlInfo.workflowId,
+                ref = branchToTrigger,
+                inputs = finalInputs
+            )
+            
+            actionResult.fold(
+                onSuccess = { actionRun ->
+                    // Update the step with GitHub Action information
+                    val updatedStep = step.copy(
+                        githubActionRunId = actionRun.id,
+                        githubActionUrl = actionRun.htmlUrl,
+                        githubActionStatus = actionRun.status,
+                        githubActionConclusion = actionRun.conclusion
+                    )
+                    
+                    println("✅ GitHub Action triggered successfully:")
+                    println("   - Run ID: ${actionRun.id}")
+                    println("   - Run Number: ${actionRun.runNumber}")
+                    println("   - Status: ${actionRun.status}")
+                    println("   - URL: ${actionRun.htmlUrl}")
+                    
+                    // Save the updated step
+                    val saveResult = workflowRepository.updateWorkflowStep(updatedStep)
+                    saveResult.fold(
+                        onSuccess = { savedStep ->
+                            Result.success(savedStep)
+                        },
+                        onFailure = { error ->
+                            println("⚠️ Action triggered but failed to update step: ${error.message}")
+                            // Return the updated step even if save failed
+                            Result.success(updatedStep)
+                        }
+                    )
+                },
+                onFailure = { error ->
+                    Result.failure(Exception("Failed to trigger GitHub Action: ${error.message}"))
+                }
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 } 

@@ -269,6 +269,8 @@ fun ReleaseDetailScreen(
                     workflowSteps = workflowSteps,
                     loadingSteps = loadingSteps,
                     isRefreshing = isRefreshing,
+                    githubWorkflowService = githubWorkflowService,
+                    githubConfig = githubConfig,
                     onStepAction = { stepId, action ->
                         scope.launch {
                             try {
@@ -469,6 +471,62 @@ fun ReleaseDetailScreen(
                                             }
                                         }
                                     }
+                                    
+                                    "trigger_github_action" -> {
+                                        delay(300) // Small delay to show loading state
+                                        
+                                        val currentStep = workflowSteps.find { it.id == stepId }
+                                        if (currentStep != null && githubConfig != null) {
+                                            println("🚀 Triggering GitHub Action for step: ${currentStep.title}")
+                                            
+                                                                        val actionResult = githubWorkflowService.triggerBuildAction(
+                                step = currentStep,
+                                release = rel,
+                                githubConfig = githubConfig!!,
+                                ref = "release" // Use release branch for builds
+                            )
+                                            
+                                            actionResult.fold(
+                                                onSuccess = { updatedStep ->
+                                                    println("✅ GitHub Action triggered successfully!")
+                                                    println("   - Run ID: ${updatedStep.githubActionRunId}")
+                                                    println("   - Status: ${updatedStep.githubActionStatus}")
+                                                    println("   - URL: ${updatedStep.githubActionUrl}")
+                                                    
+                                                    // Update the step list with GitHub Action information
+                                                    workflowSteps = workflowSteps.map { step ->
+                                                        if (step.id == stepId) updatedStep else step
+                                                    }
+                                                    
+                                                    successMessage = "✅ GitHub Action triggered successfully! Check the build status."
+                                                },
+                                                onFailure = { error ->
+                                                    println("❌ GitHub Action trigger failed: ${error.message}")
+                                                    errorMessage = "Failed to trigger GitHub Action: ${error.message}"
+                                                }
+                                            )
+                                        } else {
+                                            val missingItems = mutableListOf<String>()
+                                            if (currentStep == null) missingItems.add("workflow step")
+                                            if (githubConfig == null) missingItems.add("GitHub configuration")
+                                            errorMessage = "❌ Cannot trigger GitHub Action: Missing ${missingItems.joinToString(", ")}. Please configure GitHub settings first."
+                                        }
+                                    }
+                                    
+                                    "view_github_action" -> {
+                                        val step = workflowSteps.find { it.id == stepId }
+                                        step?.githubActionUrl?.let { url ->
+                                            println("🔗 Opening GitHub Action: $url")
+                                            try {
+                                                // Use platform-specific URL opening
+                                                com.rapido.rocket.util.openUrl(url)
+                                                successMessage = "✅ Opened GitHub Action in new tab"
+                                            } catch (e: Exception) {
+                                                println("❌ Failed to open GitHub Action: ${e.message}")
+                                                successMessage = "GitHub Action URL: $url (Copy and open in browser)"
+                                            }
+                                        }
+                                    }
 
                                 }
                             } catch (e: Exception) {
@@ -512,6 +570,8 @@ private fun WorkflowContent(
     workflowSteps: List<WorkflowStep>,
     loadingSteps: Set<String>,
     isRefreshing: Boolean,
+    githubWorkflowService: GitHubWorkflowService,
+    githubConfig: GitHubConfig?,
     onStepAction: (String, String) -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -537,6 +597,8 @@ private fun WorkflowContent(
                 step = step,
                 allSteps = sortedSteps,
                 loadingSteps = loadingSteps,
+                githubWorkflowService = githubWorkflowService,
+                githubConfig = githubConfig,
                 onAction = { action -> onStepAction(step.id, action) }
             )
         }
@@ -751,6 +813,8 @@ private fun WorkflowStepCard(
     step: WorkflowStep,
     allSteps: List<WorkflowStep>,
     loadingSteps: Set<String>,
+    githubWorkflowService: GitHubWorkflowService,
+    githubConfig: GitHubConfig?,
     onAction: (String) -> Unit
 ) {
     Card(
@@ -1034,6 +1098,72 @@ private fun WorkflowStepCard(
                                 println("🔗 NOT showing Create PR button for step ${step.stepNumber} (PR URL: '${step.githubPrUrl}')")
                             }
                             
+                            // Show GitHub Actions trigger button for build steps
+                            if (githubWorkflowService.isBuildStep(step) && 
+                                githubConfig != null && 
+                                githubWorkflowService.isWorkflowConfiguredForStep(step, githubConfig!!)) {
+                                
+                                if (step.githubActionRunId == null) {
+                                    // Show Trigger button if action hasn't been triggered yet
+                                    Button(
+                                        onClick = { onAction("trigger_github_action") },
+                                        modifier = Modifier.height(32.dp),
+                                        enabled = !isStepLoading,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.secondary
+                                        )
+                                    ) {
+                                        if (isStepLoading) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(14.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = MaterialTheme.colorScheme.onSecondary
+                                                )
+                                                Text("Triggering...", style = MaterialTheme.typography.labelSmall)
+                                            }
+                                        } else {
+                                            Text("🚀 Trigger Build", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                } else {
+                                    // Show status badge if action has been triggered
+                                    val statusColor = when (step.githubActionStatus) {
+                                        "completed" -> if (step.githubActionConclusion == "success") Color.Green else MaterialTheme.colorScheme.error
+                                        "in_progress" -> MaterialTheme.colorScheme.primary
+                                        "queued" -> MaterialTheme.colorScheme.secondary
+                                        else -> MaterialTheme.colorScheme.surfaceVariant
+                                    }
+                                    
+                                    Surface(
+                                        color = statusColor.copy(alpha = 0.2f),
+                                        shape = MaterialTheme.shapes.small
+                                    ) {
+                                        Text(
+                                            text = "GitHub Action: ${step.githubActionStatus}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            } else if (githubWorkflowService.isBuildStep(step)) {
+                                // Show information about missing configuration
+                                Surface(
+                                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                                    shape = MaterialTheme.shapes.small
+                                ) {
+                                    Text(
+                                        text = "⚠️ Build step - Configure GitHub workflow",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                            
                             Button(
                                 onClick = { onAction("complete") },
                                 modifier = Modifier.height(32.dp),
@@ -1115,6 +1245,18 @@ private fun WorkflowStepCard(
                         }
                     } else {
                         println("❌ NOT showing View PR button for step ${step.stepNumber} (PR URL: '${step.githubPrUrl}')")
+                    }
+                    
+                    // GitHub Actions buttons
+                    if (step.githubActionUrl.isNotEmpty()) {
+                        println("🔗 Showing View GitHub Action button for step ${step.stepNumber} (Action URL: '${step.githubActionUrl}')")
+                        OutlinedButton(
+                            onClick = { onAction("view_github_action") },
+                            modifier = Modifier.height(32.dp),
+                            enabled = !isStepLoading
+                        ) {
+                            Text("🚀 View Action", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }
