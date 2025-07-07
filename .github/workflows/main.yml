@@ -1,15 +1,37 @@
 name: Manual Trigger Test
 
+# Add this trigger to allow manual/API triggering
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: false
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to build'
+        required: false
+        default: 'latest'
+        type: string
+
+  # Keep any existing triggers you have
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  test-manual-run:
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Print Hello Message
-        run: echo "Hello, World! This workflow was triggered manually."
+      - uses: actions/checkout@v4
+      
+      - name: Build Application
+        run: |
+          echo "Building for environment: ${{ github.event.inputs.environment || 'staging' }}"
+          echo "Building version: ${{ github.event.inputs.version || 'latest' }}"
+          # Add your actual build steps here
