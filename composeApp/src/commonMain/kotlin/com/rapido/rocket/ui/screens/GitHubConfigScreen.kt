@@ -37,7 +37,7 @@ fun GitHubConfigScreen(
     var appRepositoryUrl by remember { mutableStateOf("") }
     var bffRepositoryUrl by remember { mutableStateOf("") }
     var githubToken by remember { mutableStateOf("") }
-    var workflowIds by remember { mutableStateOf(mutableMapOf<String, String>()) }
+    var workflowUrls by remember { mutableStateOf(mutableMapOf<String, String>()) }
     var defaultBaseBranch by remember { mutableStateOf("develop") }
     var defaultTargetBranch by remember { mutableStateOf("release") }
     var showToken by remember { mutableStateOf(false) }
@@ -60,7 +60,7 @@ fun GitHubConfigScreen(
                         appRepositoryUrl = it.appRepositoryUrl
                         bffRepositoryUrl = it.bffRepositoryUrl
                         githubToken = it.githubToken
-                        workflowIds = it.workflowIds.toMutableMap()
+                        workflowUrls = it.workflowUrls.toMutableMap()
                         defaultBaseBranch = it.defaultBaseBranch
                         defaultTargetBranch = it.defaultTargetBranch
                     }
@@ -269,19 +269,28 @@ fun GitHubConfigScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "Configure workflow IDs for build automation steps",
+                    text = "Configure workflow URLs with inputs for build automation steps",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Format: owner/repo/123456789?branch=main&param1=value1&param2=value2\nBranch parameter controls which branch to trigger from (e.g., main, develop, release)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+                
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Workflow ID fields for each supported step type
+                // Workflow URL fields for each supported step type
                 GitHubConfig.getSupportedWorkflowStepTypes().forEach { stepType ->
                     OutlinedTextField(
-                        value = workflowIds[stepType.key] ?: "",
+                        value = workflowUrls[stepType.key] ?: "",
                         onValueChange = { newValue ->
-                            workflowIds = workflowIds.toMutableMap().apply {
+                            workflowUrls = workflowUrls.toMutableMap().apply {
                                 if (newValue.isEmpty()) {
                                     remove(stepType.key)
                                 } else {
@@ -290,11 +299,13 @@ fun GitHubConfigScreen(
                             }
                         },
                         label = { Text(stepType.displayName) },
-                        placeholder = { Text("e.g., 123456789") },
+                        placeholder = { Text("e.g., owner/repo/123456789?branch=main&environment=staging&build_type=debug") },
                         modifier = Modifier.fillMaxWidth(),
                         supportingText = {
-                            Text(stepType.description)
-                        }
+                            Text("${stepType.description} - Include workflow ID and input parameters")
+                        },
+                        minLines = 2,
+                        maxLines = 3
                     )
                     
                     Spacer(modifier = Modifier.height(12.dp))
@@ -479,7 +490,7 @@ fun GitHubConfigScreen(
                                 println("   - Form appRepositoryUrl: '$appRepositoryUrl'")
                                 println("   - Form bffRepositoryUrl: '$bffRepositoryUrl'")
                                 println("   - Form githubToken length: ${githubToken.length}")
-                                println("   - Form workflowIds: $workflowIds")
+                                println("   - Form workflowUrls: $workflowUrls")
                                 println("   - Form defaultBaseBranch: '$defaultBaseBranch'")
                                 println("   - Form defaultTargetBranch: '$defaultTargetBranch'")
                                 
@@ -487,7 +498,7 @@ fun GitHubConfigScreen(
                                     appRepositoryUrl = appRepositoryUrl,
                                     bffRepositoryUrl = bffRepositoryUrl,
                                     githubToken = githubToken,
-                                    workflowIds = workflowIds.toMap(),
+                                    workflowUrls = workflowUrls.toMap(),
                                     defaultBaseBranch = defaultBaseBranch,
                                     defaultTargetBranch = defaultTargetBranch,
                                     updatedAt = currentTimeMillis()
@@ -496,7 +507,7 @@ fun GitHubConfigScreen(
                                     appRepositoryUrl = appRepositoryUrl,
                                     bffRepositoryUrl = bffRepositoryUrl,
                                     githubToken = githubToken,
-                                    workflowIds = workflowIds.toMap(),
+                                    workflowUrls = workflowUrls.toMap(),
                                     defaultBaseBranch = defaultBaseBranch,
                                     defaultTargetBranch = defaultTargetBranch,
                                     createdAt = currentTimeMillis(),
@@ -508,7 +519,7 @@ fun GitHubConfigScreen(
                                 println("   - appRepositoryUrl: '${configToSave.appRepositoryUrl}'")
                                 println("   - bffRepositoryUrl: '${configToSave.bffRepositoryUrl}'")
                                 println("   - githubToken length: ${configToSave.githubToken.length}")
-                                println("   - workflowIds: ${configToSave.workflowIds}")
+                                println("   - workflowUrls: ${configToSave.workflowUrls}")
                                 
                                 val result = githubRepository.saveGitHubConfig(configToSave)
                                 result.fold(
@@ -574,10 +585,11 @@ fun GitHubConfigScreen(
                           "• Repository URLs should be in 'owner/repository' format\n" +
                           "• Base branch is typically 'develop' or 'main'\n" +
                           "• Target branch is typically 'release' or 'staging'\n" +
-                          "• Workflow IDs are numeric IDs from GitHub Actions URLs\n" +
-                          "• Find workflow ID in: github.com/owner/repo/actions/workflows/ID\n" +
+                          "• Workflow URLs include the workflow ID and input parameters\n" +
+                          "• Include 'branch' parameter to specify which branch to trigger from\n" +
+                          "• Use placeholders like {{release.version}} for dynamic values\n" +
                           "• Configure different workflows for different build steps\n" +
-                          "• This enables automatic PR creation and build triggers",
+                          "• This enables automatic PR creation and build triggers with custom inputs",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

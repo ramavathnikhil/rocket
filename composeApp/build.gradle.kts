@@ -9,6 +9,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    kotlin("plugin.serialization") version "2.1.21"
 }
 
 kotlin {
@@ -59,6 +60,9 @@ kotlin {
             implementation("com.google.firebase:firebase-firestore")
             // PreCompose only for Android
             implementation("moe.tlaster:precompose:1.5.10")
+            
+            // Ktor HTTP client engine for Android
+            implementation("io.ktor:ktor-client-android:3.0.0")
         }
         commonMain.dependencies {
             implementation(compose.runtime)
@@ -69,6 +73,14 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtimeCompose)
+            
+            // Kotlin serialization
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+            
+            // Ktor for HTTP calls
+            implementation("io.ktor:ktor-client-core:3.0.0")
+            implementation("io.ktor:ktor-client-content-negotiation:3.0.0")
+            implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.0")
         }
         
         // Add Firebase dependencies only for non-wasm targets
@@ -85,18 +97,21 @@ kotlin {
         androidMain.get().dependsOn(nonWasmMain)
         iosMain.get().dependsOn(nonWasmMain)
         
+        val iosMain by getting {
+            dependencies {
+                // Ktor HTTP client engine for iOS
+                implementation("io.ktor:ktor-client-darwin:3.0.0")
+            }
+        }
+        
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
         
         val wasmJsMain by getting {
             dependencies {
-                implementation("io.ktor:ktor-client-core:3.0.0-wasm2")
-                implementation("io.ktor:ktor-client-content-negotiation:3.0.0-wasm2")
-                implementation("io.ktor:ktor-client-logging:3.0.0-wasm2")
-                implementation("io.ktor:ktor-client-serialization:3.0.0-wasm2")
-                implementation("io.ktor:ktor-client-json:3.0.0-wasm2")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.0-wasm2")
+                // Ktor HTTP client engine for WASM/JS
+                implementation("io.ktor:ktor-client-js:3.0.0")
             }
         }
     }

@@ -72,7 +72,12 @@ data class WorkflowStep(
     val githubPrState: String = "", // "open", "closed", "merged"
     val repositoryType: String = "", // "app" or "bff" for GitHub steps
     val sourceBranch: String = "", // Source branch for PRs
-    val targetBranch: String = "" // Target branch for PRs
+    val targetBranch: String = "", // Target branch for PRs
+    // GitHub Actions integration fields
+    val githubActionRunId: Long? = null, // GitHub Action run ID if triggered
+    val githubActionUrl: String = "", // GitHub Action run URL
+    val githubActionStatus: String = "", // "queued", "in_progress", "completed"
+    val githubActionConclusion: String? = null // "success", "failure", "cancelled", etc.
 ) {
     fun toMap(): Map<String, Any> {
         return mapOf(
@@ -99,7 +104,11 @@ data class WorkflowStep(
             "githubPrState" to githubPrState,
             "repositoryType" to repositoryType,
             "sourceBranch" to sourceBranch,
-            "targetBranch" to targetBranch
+            "targetBranch" to targetBranch,
+            "githubActionRunId" to (githubActionRunId ?: ""),
+            "githubActionUrl" to githubActionUrl,
+            "githubActionStatus" to githubActionStatus,
+            "githubActionConclusion" to (githubActionConclusion ?: "")
         )
     }
 
@@ -141,7 +150,15 @@ data class WorkflowStep(
                 githubPrState = map["githubPrState"] as? String ?: "",
                 repositoryType = map["repositoryType"] as? String ?: "",
                 sourceBranch = map["sourceBranch"] as? String ?: "",
-                targetBranch = map["targetBranch"] as? String ?: ""
+                targetBranch = map["targetBranch"] as? String ?: "",
+                githubActionRunId = map["githubActionRunId"].let { 
+                    if (it is Long) it else null 
+                },
+                githubActionUrl = map["githubActionUrl"] as? String ?: "",
+                githubActionStatus = map["githubActionStatus"] as? String ?: "",
+                githubActionConclusion = map["githubActionConclusion"].let { 
+                    if (it is String) it else null 
+                }
             )
         }
 

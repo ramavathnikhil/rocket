@@ -376,6 +376,191 @@ exports.mergeGitHubPullRequest = functions.https.onCall(async (data, context) =>
     }
 });
 
+// Firebase Function: Trigger GitHub Action Workflow
+exports.rocketTriggerGitHubAction = functions.https.onRequest((req, res) => {
+    return cors(req, res, async () => {
+        try {
+            console.log('rocketTriggerGitHubAction called with method:', req.method);
+            console.log('Headers:', req.headers);
+            console.log('Body:', req.body);
+            
+            // Handle preflight requests
+            if (req.method === 'OPTIONS') {
+                res.set('Access-Control-Allow-Origin', '*');
+                res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+                res.status(204).send('');
+                return;
+            }
+            
+            if (req.method !== 'POST') {
+                res.status(405).json({ error: 'Method not allowed' });
+                return;
+            }
+            
+            // Handle both Firebase SDK format and direct HTTP format
+            let token, repositoryUrl, workflowId, ref, inputs;
+            if (req.body.data) {
+                // Firebase SDK format
+                token = req.body.data.token;
+                repositoryUrl = req.body.data.repositoryUrl;
+                workflowId = req.body.data.workflowId;
+                ref = req.body.data.ref || 'release'; // Default to release branch
+                inputs = req.body.data.inputs || {};
+            } else {
+                // Direct HTTP format
+                token = req.body.token;
+                repositoryUrl = req.body.repositoryUrl;
+                workflowId = req.body.workflowId;
+                ref = req.body.ref || 'release'; // Default to release branch
+                inputs = req.body.inputs || {};
+            }
+            
+            // Validate required parameters
+            if (!token || !repositoryUrl || !workflowId) {
+                res.status(400).json({ 
+                    error: 'GitHub token, repository URL, and workflow ID are required',
+                    received: {
+                        hasToken: !!token,
+                        hasRepositoryUrl: !!repositoryUrl,
+                        hasWorkflowId: !!workflowId
+                    }
+                });
+                return;
+            }
+            
+            // Validate workflow ID is numeric
+            const numericWorkflowId = parseInt(workflowId, 10);
+            if (isNaN(numericWorkflowId)) {
+                res.status(400).json({ 
+                    error: 'Workflow ID must be a valid number',
+                    provided: workflowId
+                });
+                return;
+            }
+            
+            console.log('Triggering GitHub Action:', {
+                repositoryUrl,
+                workflowId: numericWorkflowId,
+                ref,
+                hasInputs: Object.keys(inputs).length > 0
+            });
+            
+            const { owner, repo } = parseRepositoryUrl(repositoryUrl);
+            
+            const octokit = new Octokit({
+                auth: token,
+            });
+            
+            // First, trigger the workflow
+            await octokit.rest.actions.createWorkflowDispatch({
+                owner,
+                repo,
+                workflow_id: numericWorkflowId,
+                ref: ref,
+                inputs: inputs
+            });
+            
+            console.log('Workflow dispatch successful, fetching recent runs...');
+            
+            // Wait a moment for the run to be created
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Get the most recent workflow run for this workflow
+            const runsResponse = await octokit.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: numericWorkflowId,
+                per_page: 5, // Get the 5 most recent runs
+                page: 1
+            });
+            
+            // Find the most recent run (likely the one we just triggered)
+            const mostRecentRun = runsResponse.data.workflow_runs[0];
+            
+            if (!mostRecentRun) {
+                console.log('No workflow runs found, returning success without run details');
+                res.json({
+                    success: true,
+                    message: 'Workflow triggered successfully',
+                    workflow: {
+                        id: numericWorkflowId,
+                        repository: `${owner}/${repo}`,
+                        ref: ref
+                    }
+                });
+                return;
+            }
+            
+            console.log('GitHub Action triggered successfully:', {
+                runId: mostRecentRun.id,
+                runNumber: mostRecentRun.run_number,
+                status: mostRecentRun.status,
+                htmlUrl: mostRecentRun.html_url
+            });
+            
+            res.json({
+                success: true,
+                message: 'GitHub Action triggered successfully',
+                actionRun: {
+                    id: mostRecentRun.id,
+                    runNumber: mostRecentRun.run_number,
+                    status: mostRecentRun.status,
+                    conclusion: mostRecentRun.conclusion,
+                    htmlUrl: mostRecentRun.html_url,
+                    workflowId: mostRecentRun.workflow_id,
+                    headBranch: mostRecentRun.head_branch,
+                    headSha: mostRecentRun.head_sha,
+                    createdAt: mostRecentRun.created_at,
+                    updatedAt: mostRecentRun.updated_at,
+                    triggeredBy: mostRecentRun.triggering_actor?.login || 'unknown'
+                },
+                workflow: {
+                    id: numericWorkflowId,
+                    repository: `${owner}/${repo}`,
+                    ref: ref
+                }
+            });
+            
+        } catch (error) {
+            console.error('rocketTriggerGitHubAction error:', error);
+            
+            if (error.status === 404) {
+                res.status(404).json({
+                    success: false,
+                    error: 'Workflow not found or repository not accessible',
+                    details: error.message
+                });
+                return;
+            }
+            
+            if (error.status === 422) {
+                res.status(422).json({
+                    success: false,
+                    error: 'Invalid workflow dispatch request',
+                    details: error.message
+                });
+                return;
+            }
+            
+            if (error.status === 403) {
+                res.status(403).json({
+                    success: false,
+                    error: 'Insufficient permissions to trigger workflow',
+                    details: 'Token needs "actions" permission'
+                });
+                return;
+            }
+            
+            res.status(500).json({ 
+                success: false,
+                error: 'Internal server error',
+                details: error.message 
+            });
+        }
+    });
+});
+
 // Simple test function for HTTP requests
 exports.testHttp = functions.https.onRequest((req, res) => {
     // Set CORS headers
